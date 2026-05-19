@@ -1,12 +1,51 @@
 {% extends "base.html" %}
+{% load persona_tags %}
 {% block title %}{{ event.title }}{% endblock %}
 {% block content %}
 <div class="mb-4"><a class="text-sm text-slate-500 hover:text-emerald-700" href="{% url 'events:list' %}">← Events</a></div>
-<h1 class="text-2xl font-bold text-slate-900">{{ event.title }}</h1>
-<p class="mt-1 text-sm text-slate-500">{{ event.get_event_type_display }} · {{ event.get_status_display }}</p>
-<p class="mt-3 text-slate-600">
+{% if can_manage_event %}
+<a class="ml-4 text-sm text-emerald-700 hover:underline" href="{% url 'events:edit' event.pk %}">Edit event</a>
+{% endif %}
+
+<div class="mb-6 flex flex-wrap items-start justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-bold text-slate-900">{{ event.title }}</h1>
+    <p class="mt-1 flex flex-wrap gap-2">
+      <span class="badge badge-slate">{{ event.get_event_type_display }}</span>
+      <span class="badge badge-{{ event.status }}">{{ event.get_status_display }}</span>
+    </p>
+  </div>
+</div>
+
+<section class="mb-8 rounded-lg border border-slate-200 bg-slate-50/80 p-4">
+  <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Approval workflow</h2>
+  <ol class="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+    {% for step in workflow_steps %}
+    <li class="flex items-center gap-2">
+      <span class="rounded-full px-2 py-0.5 {% if event.status == step %}bg-emerald-700 text-white font-semibold{% elif step == 'draft' and event.status == 'governance_approved' %}bg-slate-200{% else %}bg-white border text-slate-600{% endif %}">
+        {% if step == 'draft' %}Draft{% elif step == 'governance_approved' %}Governance approved{% elif step == 'published' %}Published{% else %}Completed{% endif %}
+      </span>
+      {% if not forloop.last %}<span class="text-slate-300">→</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% if can_manage_event and allowed_transitions %}
+  <div class="mt-4 flex flex-wrap gap-2">
+    {% for t in allowed_transitions %}
+    <form method="post" action="{% url 'events:transition' event.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="next_status" value="{{ t.status }}">
+      <button type="submit" class="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-800">{{ t.label }}</button>
+    </form>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+
+<p class="text-slate-600">
   <strong>When:</strong> {{ event.start_datetime|date:"l, F j, Y g:i A" }} — {{ event.end_datetime|date:"g:i A" }}<br>
   <strong>Where:</strong> {{ event.venue }}{% if event.location %} · {{ event.location }}{% endif %}
+  {% if event.virtual_link %}<br><strong>Virtual:</strong> <a class="text-emerald-700 underline" href="{{ event.virtual_link }}" target="_blank" rel="noopener">{{ event.virtual_link }}</a>{% endif %}
 </p>
 {% if event.linked_need %}
 <p class="mt-2 text-sm">Related need: <a class="text-emerald-700 hover:underline" href="{{ event.linked_need.get_absolute_url }}">{{ event.linked_need.title }}</a></p>
@@ -15,7 +54,10 @@
 <p class="text-sm">Related project: <a class="text-emerald-700 hover:underline" href="{{ event.linked_project.get_absolute_url }}">{{ event.linked_project.title }}</a></p>
 {% endif %}
 {% if event.target_amount %}
-<p class="mt-2 text-sm text-slate-600">Fundraising target: {{ event.target_amount }} (combined jurisdictions)</p>
+<p class="mt-2 text-sm text-slate-600">Fundraising target: <strong>{{ event.target_amount }}</strong>{% if event.fund_pool %} · Pool: {{ event.fund_pool.name }}{% endif %}</p>
+{% endif %}
+{% if event.target_audience %}
+<p class="mt-1 text-sm text-slate-500">Audience: {{ event.target_audience }}</p>
 {% endif %}
 {% if can_prefill_contribution %}
 <p class="mt-3 text-sm">
@@ -27,6 +69,71 @@
   <h2 class="text-lg font-semibold text-slate-800">Plan & schedule</h2>
   <div class="whitespace-pre-wrap rounded-lg border border-slate-100 bg-slate-50 p-4 font-sans text-sm leading-relaxed">{{ event.description }}</div>
 </section>
+
+{% if can_view_milestones %}
+<section class="mt-10 rounded-xl border bg-white p-5 shadow-sm">
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+    <h2 class="text-lg font-semibold text-slate-800">Event milestones</h2>
+    {% if can_manage_milestones %}
+    <a href="{% url 'events:milestone_create' event.pk %}" class="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white">Add milestone</a>
+    {% endif %}
+  </div>
+  {% if milestone_total_count %}
+  <p class="mb-2 text-xs text-slate-500">{{ milestone_done_count }}/{{ milestone_total_count }} completed</p>
+  <div class="progress-bar mb-4 max-w-md">
+    <div class="progress-fill" style="width: {{ milestone_progress_pct }}%"></div>
+  </div>
+  {% endif %}
+  <div class="overflow-x-auto table-responsive">
+    <table class="min-w-full text-left text-sm">
+      <thead class="border-b bg-slate-50 text-xs uppercase text-slate-500">
+        <tr>
+          <th class="p-2">Title</th>
+          <th class="p-2">Owner</th>
+          <th class="p-2">Due</th>
+          <th class="p-2">Status</th>
+          <th class="p-2">Proof</th>
+          {% if can_manage_milestones %}<th class="p-2">Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in event_milestones %}
+        <tr class="border-b">
+          <td class="p-2 font-medium">{{ m.title }}</td>
+          <td class="p-2 text-slate-600">{% if m.owner %}{{ m.owner.username }}{% else %}—{% endif %}</td>
+          <td class="p-2">{{ m.due_date }}</td>
+          <td class="p-2">
+            {% if m.completed %}
+            <span class="badge badge-done">Completed</span>
+            {% else %}
+            <span class="badge badge-pending">Pending</span>
+            {% endif %}
+          </td>
+          <td class="p-2">
+            {% if m.proof %}<a class="text-emerald-700 underline" href="{{ m.proof.url }}" target="_blank" rel="noopener">View</a>{% else %}—{% endif %}
+          </td>
+          {% if can_manage_milestones %}
+          <td class="p-2">
+            {% if not m.completed %}
+            <form method="post" action="{% url 'events:milestone_complete' event.pk m.pk %}" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2">
+              {% csrf_token %}
+              <input type="file" name="proof" class="max-w-[8rem] text-xs" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+              <button type="submit" class="text-xs font-medium text-emerald-700">Mark complete</button>
+            </form>
+            {% else %}
+            <a class="text-xs text-slate-500" href="{% url 'events:milestone_edit' event.pk m.pk %}">Edit</a>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="p-4 text-slate-500">No milestones yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
 
 {% if event.media_items.exists %}
 <section class="mt-10">

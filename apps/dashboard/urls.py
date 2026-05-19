@@ -18,4 +18,12 @@ urlpatterns = [
         views.governance_profile_sample_csv,
         name="governance_profile_sample_csv",
     ),
+    path(
+        "governance/profiles/confirm/",
+        views.governance_csv_confirm,
+        name="governance_csv_confirm",
+    ),
+    path("switch-role/", views.switch_role, name="switch_role"),
+    path("toggle-currency/", views.toggle_currency, name="toggle_currency"),
+    path("audit/uploads/", views.UploadAuditLogView.as_view(), name="upload_audit_log"),
 ]

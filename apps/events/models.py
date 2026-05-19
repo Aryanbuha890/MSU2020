@@ -13,6 +13,7 @@ class Event(TimeStampedModel):
 
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
+        GOVERNANCE_APPROVED = "governance_approved", "Governance approved"
         PUBLISHED = "published", "Published"
         REGISTRATION_OPEN = "registration_open", "Registration open"
         ONGOING = "ongoing", "Ongoing"
@@ -45,6 +46,15 @@ class Event(TimeStampedModel):
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.DRAFT)
     target_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     jurisdiction = models.CharField(max_length=16, choices=Jurisdiction.choices, default=Jurisdiction.INDIA)
+    fund_pool = models.ForeignKey(
+        "funding.FundPool",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="events",
+    )
+    target_audience = models.TextField(blank=True)
+    is_fundraising = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["start_datetime"]
@@ -56,6 +66,31 @@ class Event(TimeStampedModel):
         from django.urls import reverse
 
         return reverse("events:detail", kwargs={"pk": self.pk})
+
+
+class EventMilestone(TimeStampedModel):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="milestones")
+    title = models.CharField(max_length=255)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="event_milestones_owned",
+    )
+    due_date = models.DateField()
+    completed_date = models.DateField(null=True, blank=True)
+    proof = models.FileField(upload_to="event_milestone_proof/%Y/", blank=True, null=True)
+    proof_original_filename = models.CharField(max_length=255, blank=True)
+    completed = models.BooleanField(default=False)
+    sequence = models.PositiveIntegerField(default=0)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["sequence", "due_date", "id"]
+
+    def __str__(self):
+        return f"{self.event.title}: {self.title}"
 
 
 class EventMedia(TimeStampedModel):

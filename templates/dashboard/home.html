@@ -4,15 +4,26 @@
 <h1 class="mb-1 text-2xl font-bold text-slate-800">Welcome back</h1>
 <p class="mb-2 text-slate-600">Signed in as <strong>{{ user.username }}</strong> — <span class="text-emerald-800">{{ role_display }}</span></p>
 
-<section class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Impact scorecard">
+<section class="mb-8" aria-label="Impact scorecard">
+  <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Impact scorecard</h2>
+    <form method="post" action="{% url 'dashboard:toggle_currency' %}" class="inline-flex items-center gap-2">
+      {% csrf_token %}
+      <span class="text-xs text-slate-500">Display:</span>
+      <button type="submit" class="rounded px-2 py-1 text-xs font-medium {% if display_currency == 'USD' %}bg-emerald-700 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">USD</button>
+      <button type="submit" class="rounded px-2 py-1 text-xs font-medium {% if display_currency == 'INR' %}bg-emerald-700 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">INR</button>
+    </form>
+  </div>
+  <p class="mb-4 text-xs text-slate-500">Exchange rate: {{ exchange_rate_label }} · Updated: {{ exchange_rate_date|date:"M j, Y" }}</p>
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
   <div class="rounded-xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm">
     <p class="text-xs font-semibold uppercase tracking-wide text-emerald-900/70">Donations collected</p>
-    <p class="mt-2 text-2xl font-bold tabular-nums text-slate-900">USD {{ scorecard.donations_collected_usd|floatformat:0 }}</p>
+    <p class="mt-2 text-2xl font-bold tabular-nums text-slate-900">{{ currency_symbol }}{{ scorecard.donations_collected|floatformat:0 }}</p>
     <p class="mt-2 text-xs leading-snug text-slate-600">Cash received, allocated, or utilized (converted to USD for roll-up).</p>
   </div>
   <div class="rounded-xl border border-amber-200/80 bg-gradient-to-br from-amber-50 to-white p-5 shadow-sm">
     <p class="text-xs font-semibold uppercase tracking-wide text-amber-950/80">Pledged</p>
-    <p class="mt-2 text-2xl font-bold tabular-nums text-slate-900">USD {{ scorecard.donations_pledged_usd|floatformat:0 }}</p>
+    <p class="mt-2 text-2xl font-bold tabular-nums text-slate-900">{{ currency_symbol }}{{ scorecard.donations_pledged|floatformat:0 }}</p>
     <p class="mt-2 text-xs leading-snug text-slate-600">Outstanding pledges not yet received.</p>
   </div>
   <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -24,6 +35,7 @@
     <p class="text-xs font-semibold uppercase tracking-wide text-indigo-950/80">Students impacted</p>
     <p class="mt-2 text-2xl font-bold tabular-nums text-slate-900">{{ scorecard.students_impacted }}</p>
     <p class="mt-2 text-xs leading-snug text-slate-600">Sum of “students / residents impacted” on all non-rejected projects (set on project edit).</p>
+  </div>
   </div>
 </section>
 

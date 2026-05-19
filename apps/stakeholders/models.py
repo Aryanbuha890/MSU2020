@@ -54,6 +54,12 @@ class UserProfile(TimeStampedModel):
     )
     jurisdiction = models.CharField(max_length=16, choices=Jurisdiction.choices, default=Jurisdiction.INDIA)
     email_opt_in = models.BooleanField(default=False)
+    batch_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    department = models.CharField(max_length=255, blank=True)
+    phone = models.CharField(max_length=32, blank=True)
+    linkedin_url = models.URLField(blank=True)
+    bio = models.TextField(blank=True)
+    photo = models.ImageField(upload_to="profile_photos/%Y/", blank=True, null=True)
     needs_persona_assignment = models.BooleanField(
         default=False,
         help_text="True when imported or created without confirmed personas — show in governance roster until cleared.",
@@ -100,6 +106,47 @@ class UserStakeholderPersona(TimeStampedModel):
 
     def __str__(self):
         return f"{self.user_id}: {self.persona_type}"
+
+
+class UserRoleRequest(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="role_requests",
+    )
+    requested_persona = models.CharField(max_length=32, choices=UserProfile.StakeholderType.choices)
+    reason = models.TextField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="role_reviews_given",
+    )
+    review_notes = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "requested_persona"],
+                condition=models.Q(status="pending"),
+                name="uniq_pending_role_request_per_persona",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} → {self.requested_persona} ({self.status})"
+
+    def get_requested_persona_display(self):
+        return dict(UserProfile.StakeholderType.choices).get(self.requested_persona, self.requested_persona)
 
 
 class PendingUserRegistration(TimeStampedModel):

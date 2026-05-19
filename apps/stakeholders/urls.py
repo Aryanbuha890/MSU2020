@@ -12,4 +12,16 @@ urlpatterns = [
         name="new_user_register_done",
     ),
     path("profile/", views.ProfileUpdateView.as_view(), name="profile"),
+    path("role-requests/", views.RoleRequestListView.as_view(), name="role_requests"),
+    path("role-requests/new/", views.RoleRequestCreateView.as_view(), name="role_request_create"),
+    path(
+        "role-requests/<int:pk>/approve/",
+        views.role_request_approve,
+        name="role_request_approve",
+    ),
+    path(
+        "role-requests/<int:pk>/reject/",
+        views.role_request_reject,
+        name="role_request_reject",
+    ),
 ]

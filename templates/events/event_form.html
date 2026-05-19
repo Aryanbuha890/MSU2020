@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% load widget_tweaks %}
+{% block title %}{% if object %}Edit event{% else %}Create event{% endif %}{% endblock %}
+{% block content %}
+<nav class="breadcrumb">
+  <a href="{% url 'events:list' %}">Events</a>
+  <span class="breadcrumb-sep">›</span>
+  <span>{% if object %}Edit{% else %}Create{% endif %}</span>
+</nav>
+<h1 class="mb-6 text-2xl font-bold">{% if object %}Edit event{% else %}Create event{% endif %}</h1>
+
+<div id="fundraising-notice" class="mb-6 hidden rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+  This fundraising event will start in <strong>Draft</strong> and require <strong>Governance approval</strong> before publishing.
+</div>
+
+<form method="post" class="max-w-2xl space-y-6 rounded-xl border bg-white p-6 shadow-sm" id="event-form">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="alert-banner alert-error">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <section>
+    <h2 class="mb-3 text-sm font-semibold uppercase text-slate-500">Basic details</h2>
+    <div class="space-y-4">
+      {% for field in form %}
+        {% if field.name not in 'target_amount fund_pool target_audience is_fundraising status' %}
+        <div>
+          <label class="block text-sm font-medium" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.errors %}<p class="field-error">{{ field.errors.0 }}</p>{% endif %}
+          {% if field.help_text %}<p class="mt-1 text-xs text-slate-500">{{ field.help_text }}</p>{% endif %}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </section>
+
+  <section id="fundraising-fields" class="rounded-lg border border-emerald-100 bg-emerald-50/40 p-4">
+    <h2 class="mb-3 text-sm font-semibold uppercase text-emerald-900">Fundraising</h2>
+    <div class="space-y-4">
+      <div class="flex items-center gap-2">
+        {{ form.is_fundraising }}
+        <label class="text-sm font-medium" for="{{ form.is_fundraising.id_for_label }}">Fundraising event</label>
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="{{ form.target_amount.id_for_label }}">Target amount</label>
+        {{ form.target_amount }}
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="{{ form.fund_pool.id_for_label }}">Fund pool</label>
+        {{ form.fund_pool }}
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="{{ form.target_audience.id_for_label }}">Target audience</label>
+        {{ form.target_audience }}
+      </div>
+    </div>
+  </section>
+
+  {% if form.status.is_hidden %}{{ form.status }}{% else %}
+  <div>
+    <label class="block text-sm font-medium" for="{{ form.status.id_for_label }}">Status</label>
+    {{ form.status }}
+  </div>
+  {% endif %}
+
+  <div class="flex gap-3">
+    <button type="submit" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">Save</button>
+    <a href="{% url 'events:list' %}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  var typeEl = document.getElementById('id_event_type');
+  var fundBlock = document.getElementById('fundraising-fields');
+  var notice = document.getElementById('fundraising-notice');
+  var isNew = {% if object %}false{% else %}true{% endif %};
+  function sync() {
+    var isFund = typeEl && typeEl.value === 'fundraising';
+    if (fundBlock) fundBlock.classList.toggle('hidden', !isFund);
+    if (notice) notice.classList.toggle('hidden', !(isFund && isNew));
+  }
+  if (typeEl) typeEl.addEventListener('change', sync);
+  sync();
+})();
+</script>
+{% endblock %}

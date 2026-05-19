@@ -2,15 +2,122 @@
 {% load widget_tweaks %}
 {% block title %}Profile{% endblock %}
 {% block content %}
-<h1 class="mb-6 text-2xl font-bold">Your profile</h1>
-<form method="post" class="max-w-xl space-y-4 rounded border bg-white p-6 shadow-sm">
-  {% csrf_token %}
-  {% for field in form %}
-    <div>
-      <label class="block text-sm font-medium" for="{{ field.id_for_label }}">{{ field.label }}</label>
-      {% render_field field class="mt-1 block w-full rounded border px-3 py-2" %}
+<div class="mb-8 flex flex-wrap items-start gap-6">
+  <div class="shrink-0">
+    {% if form.instance.photo %}
+    <img src="{{ form.instance.photo.url }}" alt="" class="h-24 w-24 rounded-full border-2 border-emerald-200 object-cover">
+    {% else %}
+    <div class="flex h-24 w-24 items-center justify-center rounded-full border-2 border-dashed border-slate-300 bg-slate-100 text-2xl font-semibold text-slate-500">
+      {{ user.first_name|first|default:user.username|first|upper }}
     </div>
-  {% endfor %}
-  <button type="submit" class="rounded bg-emerald-700 px-4 py-2 text-white">Save</button>
+    {% endif %}
+  </div>
+  <div class="min-w-0 flex-1">
+    <h1 class="text-2xl font-bold text-slate-900">{{ user.get_full_name|default:user.username }}</h1>
+    <p class="text-sm text-slate-500">@{{ user.username }} · Member since {{ member_since|date:"F Y" }}</p>
+    <div class="mt-2 flex flex-wrap gap-1">
+      {% for label in persona_labels %}
+      <span class="badge badge-indigo">{{ label }}</span>
+      {% empty %}
+      <span class="badge badge-amber">Persona not identified</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="space-y-8">
+  {% csrf_token %}
+
+  <section class="rounded-xl border bg-white p-6 shadow-sm">
+    <h2 class="mb-4 text-lg font-semibold text-slate-800">Personal info</h2>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium" for="{{ user_form.first_name.id_for_label }}">First name</label>
+        {{ user_form.first_name }}
+        {% if user_form.first_name.errors %}<p class="field-error">{{ user_form.first_name.errors.0 }}</p>{% endif %}
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="{{ user_form.last_name.id_for_label }}">Last name</label>
+        {{ user_form.last_name }}
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="{{ form.batch_year.id_for_label }}">Batch year</label>
+        {% render_field form.batch_year class="mt-1 block w-full rounded border px-3 py-2" %}
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="{{ form.department.id_for_label }}">Department</label>
+        {% render_field form.department class="mt-1 block w-full rounded border px-3 py-2" %}
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="{{ form.phone.id_for_label }}">Phone</label>
+        {% render_field form.phone class="mt-1 block w-full rounded border px-3 py-2" %}
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="{{ form.linkedin_url.id_for_label }}">LinkedIn URL</label>
+        {% render_field form.linkedin_url class="mt-1 block w-full rounded border px-3 py-2" %}
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-sm font-medium" for="{{ form.photo.id_for_label }}">Profile photo</label>
+        {{ form.photo }}
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-sm font-medium" for="{{ form.bio.id_for_label }}">Bio</label>
+        {% render_field form.bio class="mt-1 block w-full rounded border px-3 py-2" %}
+      </div>
+    </div>
+  </section>
+
+  <section class="rounded-xl border bg-white p-6 shadow-sm">
+    <h2 class="mb-4 text-lg font-semibold text-slate-800">Account</h2>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium" for="{{ form.organization.id_for_label }}">Organization</label>
+        {{ form.organization }}
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="{{ form.jurisdiction.id_for_label }}">Jurisdiction</label>
+        {{ form.jurisdiction }}
+      </div>
+      <div class="sm:col-span-2 flex items-center gap-2">
+        {{ form.email_opt_in }}
+        <label class="text-sm" for="{{ form.email_opt_in.id_for_label }}">Email opt-in for updates</label>
+      </div>
+    </div>
+  </section>
+
+  <section class="rounded-xl border bg-white p-6 shadow-sm">
+    <h2 class="mb-4 text-lg font-semibold text-slate-800">Roles</h2>
+    <p class="mb-3 text-sm text-slate-600">Your current access is shown above. Need another persona?</p>
+    <a href="{% url 'stakeholders:role_request_create' %}" class="inline-flex rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">Request additional role</a>
+    <a href="{% url 'stakeholders:role_requests' %}" class="ml-3 text-sm text-emerald-700 underline">View my requests</a>
+    {% if pending_role_requests %}
+    <ul class="mt-4 space-y-2 text-sm">
+      {% for pr in pending_role_requests %}
+      <li class="rounded border border-amber-200 bg-amber-50 px-3 py-2">
+        <span class="badge badge-pending">Pending</span>
+        {{ pr.get_requested_persona_display }} — submitted {{ pr.created_at|date:"M j, Y" }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+
+  <button type="submit" class="rounded-lg bg-emerald-700 px-6 py-2.5 text-sm font-medium text-white hover:bg-emerald-800">Save profile</button>
 </form>
+
+{% if recent_activity %}
+<section class="mt-10 rounded-xl border bg-white p-6 shadow-sm">
+  <h2 class="mb-4 text-lg font-semibold text-slate-800">Recent activity</h2>
+  <ul class="space-y-3 border-l-2 border-emerald-200 pl-4">
+    {% for item in recent_activity %}
+    <li class="text-sm">
+      <span class="text-xs text-slate-400">{{ item.when|date:"M j, Y g:i A" }}</span>
+      <p class="text-slate-700">
+        {% if item.url %}<a class="text-emerald-700 hover:underline" href="{{ item.url }}">{{ item.label }}</a>{% else %}{{ item.label }}{% endif %}
+      </p>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
 {% endblock %}

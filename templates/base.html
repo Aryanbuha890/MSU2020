@@ -8,6 +8,7 @@
   <title>{% block title %}MSU Vision 2020{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="{% static 'css/timeline.css' %}">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
   {% block extra_head %}{% endblock %}
 </head>
 <body class="min-h-full bg-slate-50 text-slate-900" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
@@ -28,38 +29,150 @@
         <span class="shrink-0 text-xs font-medium uppercase tracking-wide text-white/80 sm:text-sm">MSU Vision 2020</span>
       </div>
     </div>
-    <nav class="border-b border-slate-200 bg-white">
-      <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-end gap-3 px-4 py-2.5 text-sm">
-        {% if user.is_authenticated %}
-          <a class="text-slate-600 hover:text-emerald-700" href="{% url 'needs:list' %}">Needs</a>
-          <a class="text-slate-600 hover:text-emerald-700" href="{% url 'projects:list' %}">Projects</a>
-          <a class="text-slate-600 hover:text-emerald-700" href="{% url 'events:list' %}">Events</a>
-          <a class="text-slate-600 hover:text-emerald-700" href="{% url 'dashboard:project_rollup' %}">Rollup</a>
-          <a class="text-slate-600 hover:text-emerald-700" href="{% url 'funding:contributions' %}">Funding</a>
-          <a class="text-slate-600 hover:text-emerald-700" href="{% url 'funding:pools' %}">Pools</a>
-          {% if user|has_any_persona:"governance,foundation_admin" %}
-          <a class="text-slate-600 hover:text-emerald-700" href="{% url 'dashboard:governance_queue' %}">Governance</a>
+    <nav class="border-b border-slate-200 bg-white" aria-label="Main">
+      <div class="mx-auto max-w-6xl px-4 py-2.5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          {% if user.is_authenticated %}
+          <button
+            type="button"
+            id="nav-toggle"
+            class="nav-toggle md:hidden"
+            aria-expanded="false"
+            aria-controls="nav-menu"
+            aria-label="Toggle navigation menu"
+          >
+            <span class="nav-toggle-bar"></span>
+            <span class="nav-toggle-bar"></span>
+            <span class="nav-toggle-bar"></span>
+          </button>
           {% endif %}
-          <a class="text-slate-600 hover:text-emerald-700" href="{% url 'stakeholders:profile' %}">Profile</a>
-          <span class="text-slate-400">|</span>
-          <span class="text-slate-500">{{ user.username }}</span>
-          <a class="rounded bg-slate-200 px-2 py-1 hover:bg-slate-300" href="{% url 'account_logout' %}">Logout</a>
-        {% else %}
-          <a class="rounded bg-emerald-700 px-3 py-1.5 text-white hover:bg-emerald-800" href="{% url 'account_login' %}">Login</a>
-        {% endif %}
+
+          <div id="nav-menu" class="hidden w-full flex-col gap-1 text-sm md:flex md:w-auto md:flex-1 md:flex-row md:flex-wrap md:items-center md:justify-end md:gap-3">
+            {% if user.is_authenticated %}
+              {% for item in nav_items %}
+                {% if item.key != 'profile' %}
+                <a
+                  href="{{ item.url }}"
+                  class="nav-link text-slate-600 hover:text-emerald-700{% if item.active %} nav-link-active{% endif %}"
+                >{{ item.label }}</a>
+                {% endif %}
+              {% endfor %}
+
+              {% if nav_more_items %}
+              <div class="nav-more-dropdown relative">
+                <button
+                  type="button"
+                  class="nav-more-btn text-slate-600 hover:text-emerald-700 md:inline-flex"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                >More ▾</button>
+                <div class="nav-more-panel" role="menu">
+                  {% for item in nav_more_items %}
+                  <a
+                    href="{{ item.url }}"
+                    role="menuitem"
+                    class="block px-3 py-2 text-slate-700 hover:bg-slate-50{% if item.active %} nav-link-active{% endif %}"
+                  >{{ item.label }}</a>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+
+              {% for item in nav_items %}
+                {% if item.key == 'profile' %}
+                <a
+                  href="{{ item.url }}"
+                  class="nav-link text-slate-600 hover:text-emerald-700{% if item.active %} nav-link-active{% endif %}"
+                >{{ item.label }}</a>
+                {% endif %}
+              {% endfor %}
+
+              <span class="hidden text-slate-300 md:inline">|</span>
+
+              <div class="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2 md:border-0 md:pt-0">
+                {% if show_role_switcher %}
+                <form method="post" action="{% url 'dashboard:switch_role' %}" class="role-switcher inline-flex items-center gap-1">
+                  {% csrf_token %}
+                  <label for="active-persona" class="sr-only">Active role</label>
+                  <select
+                    id="active-persona"
+                    name="persona"
+                    onchange="this.form.submit()"
+                    class="text-slate-600"
+                  >
+                    {% for p in persona_choices %}
+                    <option value="{{ p.code }}"{% if p.active %} selected{% endif %}>{{ p.label }}</option>
+                    {% endfor %}
+                  </select>
+                </form>
+                {% else %}
+                  {% for p in persona_choices %}
+                    {% if forloop.first %}
+                    <span class="text-xs text-slate-500">{{ p.label }}</span>
+                    {% endif %}
+                  {% empty %}
+                    <span class="text-slate-500">{{ user.username }}</span>
+                  {% endfor %}
+                {% endif %}
+
+                {% if not show_role_switcher and not persona_choices %}
+                <span class="text-slate-500">{{ user.username }}</span>
+                {% endif %}
+
+                <a class="rounded bg-slate-200 px-2 py-1 text-slate-700 hover:bg-slate-300" href="{% url 'account_logout' %}">Logout</a>
+              </div>
+            {% else %}
+              <a class="rounded bg-emerald-700 px-3 py-1.5 text-white hover:bg-emerald-800" href="{% url 'account_login' %}">Login</a>
+            {% endif %}
+          </div>
+        </div>
       </div>
     </nav>
   </header>
   <main class="mx-auto max-w-6xl px-4 py-8">
     {% if messages %}
-      <ul class="mb-6 space-y-2">
+      <ul class="mb-6 space-y-2" role="status">
         {% for message in messages %}
-          <li class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">{{ message }}</li>
+          <li class="alert-banner alert-{% if message.tags == 'error' %}error{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %}">
+            <span>{{ message }}</span>
+            <button type="button" class="alert-dismiss" aria-label="Dismiss" onclick="this.closest('li').remove()">×</button>
+          </li>
         {% endfor %}
       </ul>
     {% endif %}
     {% block content %}{% endblock %}
   </main>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script>
+    (function () {
+      var toggle = document.getElementById('nav-toggle');
+      var menu = document.getElementById('nav-menu');
+      if (toggle && menu) {
+        toggle.addEventListener('click', function () {
+          var open = menu.classList.toggle('nav-menu-open');
+          menu.classList.toggle('hidden', !open);
+          toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+      }
+      document.querySelectorAll('.nav-more-btn').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var wrap = btn.closest('.nav-more-dropdown');
+          if (wrap) {
+            wrap.classList.toggle('is-open');
+            btn.setAttribute('aria-expanded', wrap.classList.contains('is-open'));
+          }
+        });
+      });
+      document.addEventListener('click', function () {
+        document.querySelectorAll('.nav-more-dropdown.is-open').forEach(function (el) {
+          el.classList.remove('is-open');
+          var b = el.querySelector('.nav-more-btn');
+          if (b) b.setAttribute('aria-expanded', 'false');
+        });
+      });
+    })();
+  </script>
+  {% block extra_js %}{% endblock %}
 </body>
 </html>

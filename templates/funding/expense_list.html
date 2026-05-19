@@ -1,30 +1,61 @@
 {% extends "base.html" %}
 {% block title %}Expenses{% endblock %}
 {% block content %}
-<div class="mb-6 flex justify-between">
+<div class="mb-6 flex flex-wrap justify-between gap-3">
   <h1 class="text-2xl font-bold">Expenses</h1>
   {% load persona_tags %}
-{% if user|has_any_persona:"foundation_admin,finance_controller,project_lead" %}
+  {% if user|has_any_persona:"foundation_admin,finance_controller,project_lead" %}
   <a class="rounded bg-emerald-700 px-4 py-2 text-sm text-white" href="{% url 'funding:expense_create' %}">New expense</a>
   {% endif %}
 </div>
-<table class="w-full text-left text-sm">
+
+<form method="get" class="filter-bar">
+  <div>
+    <label for="id_q">Search</label>
+    <input type="search" name="q" id="id_q" value="{{ request.GET.q }}" placeholder="Project, description…">
+  </div>
+  <div>
+    <label for="id_status">Status</label>
+    {{ filter.form.status }}
+  </div>
+  <div>
+    <label for="id_fund_pool">Fund pool</label>
+    {{ filter.form.fund_pool }}
+  </div>
+  <div>
+    <label for="id_order_by">Sort</label>
+    {{ filter.form.order_by }}
+  </div>
+  <button type="submit" class="rounded bg-slate-800 px-4 py-2 text-sm text-white hover:bg-slate-900">Apply</button>
+</form>
+
+{% if active_filters %}
+<div class="filter-tags">
+  {% for f in active_filters %}
+  <span class="filter-tag">{{ f.label }} <a href="?{% for k,v in request.GET.items %}{% if k != f.key %}{{ k }}={{ v }}&{% endif %}{% endfor %}">×</a></span>
+  {% endfor %}
+  <a class="text-xs text-emerald-700 underline" href="{% url 'funding:expenses' %}">Clear all</a>
+</div>
+{% endif %}
+
+<div class="table-responsive overflow-x-auto rounded-lg border bg-white shadow-sm">
+<table class="min-w-full text-left text-sm">
   <thead class="border-b bg-slate-50">
     <tr>
-      <th class="p-2">Project</th>
-      <th class="p-2">Amount</th>
-      <th class="p-2">Owners</th>
-      <th class="p-2">Status</th>
+      <th class="sortable-th p-2 font-semibold"><a href="?order_by={% if current_order == 'project' %}-{% endif %}project">Project</a></th>
+      <th class="sortable-th p-2 font-semibold"><a href="?order_by={% if current_order == 'amount' %}-{% endif %}amount">Amount</a></th>
+      <th class="p-2 font-semibold">Owners</th>
+      <th class="sortable-th p-2 font-semibold"><a href="?order_by={% if current_order == 'status' %}-{% endif %}status">Status</a></th>
       <th class="p-2">Actions</th>
     </tr>
   </thead>
   <tbody>
     {% for e in expenses %}
-    <tr class="border-b">
+    <tr class="border-b hover:bg-slate-50/50">
       <td class="p-2"><a class="text-emerald-700" href="{{ e.project.get_absolute_url }}">{{ e.project.title }}</a></td>
       <td class="p-2">{{ e.amount }} {{ e.currency }}</td>
       <td class="p-2 text-slate-600">{% for o in e.owners.all %}{{ o.username }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
-      <td class="p-2">{{ e.get_status_display }}</td>
+      <td class="p-2"><span class="badge badge-{{ e.status }}">{{ e.get_status_display }}</span></td>
       <td class="p-2 space-x-2">
         {% if e.status == 'pending' or e.status == 'pending_governance' %}
         <form method="post" action="{% url 'funding:expense_approve' e.pk %}" class="inline">{% csrf_token %}<button class="text-xs text-blue-700">Approve</button></form>
@@ -39,4 +70,19 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
+
+{% if page_obj %}
+<nav class="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+  <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  <div class="flex gap-2">
+    {% if page_obj.has_previous %}
+    <a class="rounded border px-3 py-1" href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">← Prev</a>
+    {% endif %}
+    {% if page_obj.has_next %}
+    <a class="rounded border px-3 py-1" href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next →</a>
+    {% endif %}
+  </div>
+</nav>
+{% endif %}
 {% endblock %}

@@ -9,7 +9,9 @@ from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.generic import TemplateView
 
+from apps.core.currency_utils import convert_usd_amount, exchange_rate_context, usd_to_inr_rate
 from apps.core.permissions import has_stakeholder_type, user_stakeholder_codes
+from apps.projects.models import Milestone
 from apps.events.models import Event
 from apps.funding.models import Contribution, Expense
 from apps.needs.models import Need
@@ -33,7 +35,18 @@ class HomeView(LoginRequiredMixin, TemplateView):
         ctx["persona_codes"] = sorted(codes)
         ctx["role_display"] = profile.persona_display() if profile else ""
         ctx["stakeholder_type"] = profile.stakeholder_type if profile else None
-        ctx["scorecard"] = scorecard.organization_scorecard()
+        sc = scorecard.organization_scorecard()
+        display_currency = self.request.session.get("display_currency", "USD")
+        if display_currency not in ("USD", "INR"):
+            display_currency = "USD"
+        ctx["display_currency"] = display_currency
+        ctx["currency_symbol"] = "₹" if display_currency == "INR" else "$"
+        ctx.update(exchange_rate_context())
+        ctx["scorecard"] = {
+            **sc,
+            "donations_collected": convert_usd_amount(sc["donations_collected_usd"], display_currency),
+            "donations_pledged": convert_usd_amount(sc["donations_pledged_usd"], display_currency),
+        }
         ctx["recent_needs"] = filter_needs_for_user(Need.objects.all(), u)[:6]
         ctx["recent_projects"] = filter_projects_for_user(
             Project.objects.select_related("lead", "need"), u
@@ -150,19 +163,40 @@ class ProjectRollupView(LoginRequiredMixin, TemplateView):
                 self.request.user,
             )
         )
+        today = timezone.localdate()
+        stalled_cutoff = today - timedelta(days=14)
         rows = []
         for p in projects:
             pct = calculate_project_progress(p)
             overdue = p.milestones.filter(status="overdue").count()
+            tranche_pending = p.milestones.filter(
+                tranche_governance_status=Milestone.TrancheGovernance.AWAITING_GOVERNANCE
+            ).count()
+            is_stalled = False
+            stalled_days = 0
+            if p.status == Project.Status.IN_PROGRESS and pct == 0:
+                ref_date = p.updated_at.date() if p.updated_at else p.created_at.date()
+                if ref_date <= stalled_cutoff:
+                    is_stalled = True
+                    stalled_days = (today - ref_date).days
             rows.append(
                 {
                     "project": p,
                     "progress_pct": pct,
                     "overdue_count": overdue,
+                    "tranche_pending_count": tranche_pending,
+                    "is_stalled": is_stalled,
+                    "stalled_days": stalled_days,
                     "funding_gate_metrics": project_funding_gate_metrics(p),
                 }
             )
         ctx["rows"] = rows
+        codes = user_stakeholder_codes(self.request.user)
+        ctx["show_programs_section"] = self.request.user.is_superuser or codes & {
+            UserProfile.StakeholderType.GOVERNANCE,
+            UserProfile.StakeholderType.FOUNDATION_ADMIN,
+        }
+        ctx["program_rows"] = []
         return ctx
 
 
@@ -203,6 +237,14 @@ class GovernanceQueueView(LoginRequiredMixin, TemplateView):
         ctx["milestones_funding_gov"] = milestones_awaiting_funding_release()
         ctx["users_needing_persona"] = roster.users_needing_persona_assignment(rq)
         ctx["bulk_profile_form"] = GovernanceProfileBulkForm()
+        ctx["csv_preview"] = self.request.session.pop("csv_import_preview", None)
+        from apps.stakeholders.models import UserRoleRequest
+
+        pending = UserRoleRequest.objects.filter(status=UserRoleRequest.Status.PENDING).select_related(
+            "user"
+        )
+        ctx["pending_role_requests"] = pending
+        ctx["pending_role_request_count"] = pending.count()
         return ctx
 
 
@@ -245,6 +287,43 @@ def governance_profile_bulk_upload(request):
     if err:
         messages.error(request, err)
         return redirect("dashboard:governance_queue")
+    preview = _build_csv_preview(rows)
+    request.session["csv_import_preview"] = preview
+    request.session["csv_import_rows"] = rows
+    if preview["error_count"]:
+        messages.warning(
+            request,
+            f"CSV parsed: {preview['valid_count']} valid, {preview['flagged_count']} flagged, "
+            f"{preview['error_count']} error(s). Review before confirming.",
+        )
+    else:
+        messages.info(
+            request,
+            f"CSV ready: {preview['valid_count']} valid row(s), {preview['flagged_count']} flagged. Confirm to import.",
+        )
+    return redirect("dashboard:governance_queue")
+
+
+def governance_csv_confirm(request):
+    if not request.user.is_authenticated:
+        return auth_redirect_login(request.get_full_path())
+    if not (
+        request.user.is_superuser
+        or has_stakeholder_type(
+            request.user,
+            UserProfile.StakeholderType.GOVERNANCE,
+            UserProfile.StakeholderType.FOUNDATION_ADMIN,
+        )
+    ):
+        messages.error(request, "Not allowed.")
+        return redirect("dashboard:home")
+    if request.method != "POST":
+        return redirect("dashboard:governance_queue")
+    rows = request.session.pop("csv_import_rows", None)
+    request.session.pop("csv_import_preview", None)
+    if not rows:
+        messages.error(request, "No import in progress. Upload a CSV again.")
+        return redirect("dashboard:governance_queue")
     result = apply_profile_bulk_rows(rows)
     for w in result["warnings"]:
         messages.warning(request, w)
@@ -258,6 +337,86 @@ def governance_profile_bulk_upload(request):
     elif not result["errors"]:
         messages.info(request, "No rows processed.")
     return redirect("dashboard:governance_queue")
+
+
+def _build_csv_preview(rows: list[dict]) -> dict:
+    from apps.stakeholders.persona_utils import parse_persona_cell
+
+    flagged = []
+    errors = []
+    valid_count = 0
+    for i, row in enumerate(rows, start=1):
+        username = (row.get("username") or "").strip()
+        email = (row.get("email") or "").strip()
+        if not username or not email:
+            errors.append({"row": i, "username": username or "—", "reason": "Missing username or email"})
+            continue
+        personas_raw = row.get("personas") or ""
+        valid_p, unknown = parse_persona_cell(personas_raw)
+        if unknown:
+            flagged.append(
+                {"row": i, "username": username, "reason": f"Unknown persona token(s): {', '.join(unknown)}"}
+            )
+        elif not valid_p and not personas_raw.strip():
+            flagged.append({"row": i, "username": username, "reason": "No personas — will need assignment"})
+        else:
+            valid_count += 1
+    return {
+        "valid_count": valid_count,
+        "flagged_count": len(flagged),
+        "error_count": len(errors),
+        "flagged_rows": flagged[:50],
+        "error_rows": errors[:50],
+        "total_rows": len(rows),
+    }
+
+
+def switch_role(request):
+    if request.method != "POST" or not request.user.is_authenticated:
+        return redirect("dashboard:home")
+    persona = (request.POST.get("persona") or "").strip()
+    codes = user_stakeholder_codes(request.user)
+    if request.user.is_superuser:
+        codes = codes | {UserProfile.StakeholderType.FOUNDATION_ADMIN}
+    if persona in codes:
+        request.session["active_persona"] = persona
+        messages.success(request, "Active role updated.")
+    return redirect(request.META.get("HTTP_REFERER") or "dashboard:home")
+
+
+def toggle_currency(request):
+    if request.method != "POST" or not request.user.is_authenticated:
+        return redirect("dashboard:home")
+    current = request.session.get("display_currency", "USD")
+    request.session["display_currency"] = "INR" if current == "USD" else "USD"
+    return redirect("dashboard:home")
+
+
+class UploadAuditLogView(LoginRequiredMixin, TemplateView):
+    template_name = "core/upload_audit_log.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not (
+            request.user.is_superuser
+            or has_stakeholder_type(
+                request.user,
+                UserProfile.StakeholderType.FOUNDATION_ADMIN,
+                UserProfile.StakeholderType.GOVERNANCE,
+                UserProfile.StakeholderType.AUDITOR,
+            )
+        ):
+            return redirect("dashboard:home")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["audit_entries"] = []
+        u = self.request.user
+        ctx["read_only"] = not (
+            u.is_superuser
+            or has_stakeholder_type(u, UserProfile.StakeholderType.FOUNDATION_ADMIN)
+        )
+        return ctx
 
 
 def governance_profile_sample_csv(request):

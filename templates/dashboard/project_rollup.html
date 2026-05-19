@@ -2,7 +2,7 @@
 {% block title %}Project rollup — MSU Vision 2020{% endblock %}
 {% block content %}
 <h1 class="mb-6 text-2xl font-bold">All projects — milestone tracker</h1>
-<div class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+<div class="table-responsive overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
   <table class="min-w-full text-left text-sm">
     <thead class="border-b border-slate-200 bg-slate-50">
       <tr>
@@ -20,13 +20,29 @@
         <td class="p-3"><a class="text-emerald-700 hover:underline" href="{{ row.project.get_absolute_url }}">{{ row.project.title }}</a></td>
         <td class="p-3 text-slate-600">{% if row.project.lead %}{{ row.project.lead.username }}{% else %}—{% endif %}</td>
         <td class="p-3 w-48">
-          <div class="h-2 w-full rounded bg-slate-200">
-            <div class="h-2 rounded bg-emerald-600" style="width: {{ row.progress_pct }}%"></div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ row.progress_pct }}%"></div>
           </div>
           <span class="text-xs text-slate-500">{{ row.progress_pct }}%</span>
         </td>
-        <td class="p-3">{{ row.project.get_status_display }}</td>
-        <td class="p-3">{% if row.overdue_count %}<span class="text-red-600">⚠ {{ row.overdue_count }} overdue</span>{% else %}—{% endif %}</td>
+        <td class="p-3 text-xs text-slate-600">
+          {% with m=row.funding_gate_metrics %}
+          Released {{ m.released_pct|default:0 }}% · Pending {{ m.pending_governance_pct|default:0 }}%
+          {% endwith %}
+        </td>
+        <td class="p-3"><span class="badge badge-{{ row.project.status }}">{{ row.project.get_status_display }}</span></td>
+        <td class="p-3 space-y-1">
+          {% if row.is_stalled %}
+          <span class="alert-pill alert-stalled" data-tooltip="No milestone progress for {{ row.stalled_days }} days while in progress">🔴 Stalled {{ row.stalled_days }}d</span>
+          {% endif %}
+          {% if row.overdue_count %}
+          <span class="alert-pill alert-overdue" data-tooltip="{{ row.overdue_count }} milestone(s) past due date">⚠ {{ row.overdue_count }} overdue</span>
+          {% endif %}
+          {% if row.tranche_pending_count %}
+          <span class="alert-pill alert-tranche" data-tooltip="{{ row.tranche_pending_count }} tranche(s) awaiting governance release">💰 Tranche awaiting</span>
+          {% endif %}
+          {% if not row.is_stalled and not row.overdue_count and not row.tranche_pending_count %}—{% endif %}
+        </td>
       </tr>
       {% empty %}
       <tr><td colspan="6" class="p-6 text-center text-slate-500">No projects.</td></tr>
@@ -34,4 +50,35 @@
     </tbody>
   </table>
 </div>
+
+{% if show_programs_section %}
+<section class="mt-10">
+  <h2 class="mb-4 text-lg font-semibold text-slate-900">Programs — Phase Progress</h2>
+  {% if program_rows %}
+  <div class="overflow-x-auto rounded-lg border bg-white shadow-sm">
+    <table class="min-w-full text-left text-sm">
+      <thead class="border-b bg-slate-50 text-xs uppercase text-slate-500">
+        <tr>
+          <th class="p-3">Program</th>
+          <th class="p-3">Phase</th>
+          <th class="p-3">Progress</th>
+          <th class="p-3">Pool utilization</th>
+          <th class="p-3">Status</th>
+          <th class="p-3">Milestones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for prog in program_rows %}
+        <tr class="border-b"><td class="p-3" colspan="6">{{ prog.title }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+    Program data will appear here once the Programs module is added on the backend.
+  </p>
+  {% endif %}
+</section>
+{% endif %}
 {% endblock %}

@@ -2,15 +2,37 @@
 {% block title %}Fund pools{% endblock %}
 {% block content %}
 <h1 class="mb-6 text-2xl font-bold">Fund pools</h1>
-<ul class="space-y-3">
-  {% for p in pools %}
-    <li class="rounded border bg-white p-4 shadow-sm">
-      <span class="font-medium">{{ p.name }}</span>
-      <span class="text-sm text-slate-500">({{ p.get_jurisdiction_display }})</span>
-      {% if p.description %}<p class="mt-1 text-sm text-slate-600">{{ p.description }}</p>{% endif %}
-    </li>
+<div class="grid gap-4 sm:grid-cols-2">
+  {% for row in pool_rows %}
+  <article class="card-hover rounded-xl border bg-white p-5 shadow-sm">
+    <div class="flex flex-wrap items-start justify-between gap-2">
+      <h2 class="text-lg font-semibold text-slate-900">{{ row.pool.name }}</h2>
+      <span class="badge badge-slate">{{ row.pool.get_jurisdiction_display }}</span>
+    </div>
+    <div class="pool-card-stats">
+      <div>
+        <p class="text-xs uppercase text-slate-500">Collected</p>
+        <p class="text-lg font-bold tabular-nums stat-collected">USD {{ row.total_collected|floatformat:0 }}</p>
+      </div>
+      <div>
+        <p class="text-xs uppercase text-slate-500">Allocated</p>
+        <p class="text-lg font-bold tabular-nums stat-allocated">USD {{ row.total_allocated|floatformat:0 }}</p>
+      </div>
+      <div>
+        <p class="text-xs uppercase text-slate-500">Remaining</p>
+        <p class="text-lg font-bold tabular-nums stat-remaining">USD {{ row.total_remaining|floatformat:0 }}</p>
+      </div>
+    </div>
+    <p class="mb-1 text-xs text-slate-500">Utilization {{ row.utilization_pct }}%</p>
+    <div class="progress-bar">
+      <div class="progress-fill {{ row.util_class }}" style="width: {{ row.utilization_pct }}%"></div>
+    </div>
+    {% if row.pool.description %}
+    <p class="mt-3 text-sm text-slate-600">{{ row.pool.description }}</p>
+    {% endif %}
+  </article>
   {% empty %}
-    <li class="text-slate-500">No pools — run <code class="rounded bg-slate-100 px-1">python manage.py load_demo_data</code></li>
+  <p class="col-span-2 text-slate-500">No pools — run <code class="rounded bg-slate-100 px-1">python manage.py load_demo_data</code></p>
   {% endfor %}
-</ul>
+</div>
 {% endblock %}

@@ -1,12 +1,16 @@
 from datetime import date
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, ListView
+from django_filters.views import FilterView
 
 from apps.events.models import Event
+from apps.funding.filters import ContributionFilter, ExpenseFilter
 from apps.funding.forms import ContributionForm, ExpenseForm
 from apps.funding.models import Contribution, Expense, FundPool
 from apps.funding.visibility import (
@@ -16,6 +20,7 @@ from apps.funding.visibility import (
     filter_contributions,
     filter_expenses,
 )
+from apps.core.currency_utils import exchange_rate_context
 from apps.core.permissions import has_stakeholder_type
 from apps.needs.visibility import filter_projects_for_user
 from apps.projects.models import Project
@@ -36,16 +41,75 @@ def _fund_pool_for_project(project):
     return FundPool.objects.filter(jurisdiction=fj).first()
 
 
+_COLLECTED_STATUSES = (
+    Contribution.Status.RECEIVED,
+    Contribution.Status.ALLOCATED,
+    Contribution.Status.UTILIZED,
+)
+_ALLOCATED_EXPENSE_STATUSES = (
+    Expense.Status.APPROVED,
+    Expense.Status.DISBURSED,
+)
+
+
+def _annotate_pool_balances(pools):
+    rows = []
+    for pool in pools:
+        collected = (
+            Contribution.objects.filter(fund_pool=pool, status__in=_COLLECTED_STATUSES).aggregate(
+                t=Sum("amount_usd")
+            )["t"]
+            or Decimal("0")
+        )
+        allocated = (
+            Expense.objects.filter(fund_pool=pool, status__in=_ALLOCATED_EXPENSE_STATUSES).aggregate(
+                t=Sum("amount_usd")
+            )["t"]
+            or Decimal("0")
+        )
+        remaining = collected - allocated
+        util_pct = 0
+        if collected > 0:
+            util_pct = min(100, int((allocated / collected) * 100))
+        if util_pct < 50:
+            util_class = "progress-low"
+        elif util_pct <= 80:
+            util_class = "progress-mid"
+        else:
+            util_class = "progress-full"
+        rows.append(
+            {
+                "pool": pool,
+                "total_collected": collected,
+                "total_allocated": allocated,
+                "total_remaining": remaining,
+                "utilization_pct": util_pct,
+                "util_class": util_class,
+            }
+        )
+    return rows
+
+
 class FundPoolListView(LoginRequiredMixin, ListView):
     model = FundPool
     template_name = "funding/pool_list.html"
-    context_object_name = "pools"
+    context_object_name = "pool_rows"
+
+    def get_queryset(self):
+        return FundPool.objects.all()
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["pool_rows"] = _annotate_pool_balances(self.object_list)
+        return ctx
 
 
-class ContributionListView(LoginRequiredMixin, ListView):
+class ContributionListView(LoginRequiredMixin, FilterView):
     model = Contribution
     template_name = "funding/contribution_list.html"
     context_object_name = "contributions"
+    filterset_class = ContributionFilter
+    paginate_by = 25
 
     def get_queryset(self):
         return filter_contributions(
@@ -54,6 +118,23 @@ class ContributionListView(LoginRequiredMixin, ListView):
             ),
             self.request.user,
         )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["filter"] = self.filterset
+        params = self.request.GET.copy()
+        ctx["active_filters"] = []
+        if params.get("q"):
+            ctx["active_filters"].append({"key": "q", "label": f'Search: "{params["q"]}"'})
+        if params.get("status"):
+            label = dict(Contribution.Status.choices).get(params["status"], params["status"])
+            ctx["active_filters"].append({"key": "status", "label": f"Status: {label}"})
+        if params.get("fund_pool"):
+            pool = FundPool.objects.filter(pk=params["fund_pool"]).first()
+            if pool:
+                ctx["active_filters"].append({"key": "fund_pool", "label": f"Pool: {pool.name}"})
+        ctx["current_order"] = params.get("order_by", "")
+        return ctx
 
 
 class ContributionCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
@@ -64,6 +145,11 @@ class ContributionCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView
 
     def test_func(self):
         return can_record_contribution(self.request.user)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(exchange_rate_context())
+        return ctx
 
     def get_initial(self):
         initial = super().get_initial()
@@ -105,10 +191,12 @@ class ContributionCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView
         return super().form_valid(form)
 
 
-class ExpenseListView(LoginRequiredMixin, ListView):
+class ExpenseListView(LoginRequiredMixin, FilterView):
     model = Expense
     template_name = "funding/expense_list.html"
     context_object_name = "expenses"
+    filterset_class = ExpenseFilter
+    paginate_by = 25
 
     def get_queryset(self):
         return filter_expenses(
@@ -117,6 +205,23 @@ class ExpenseListView(LoginRequiredMixin, ListView):
             ),
             self.request.user,
         )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["filter"] = self.filterset
+        params = self.request.GET.copy()
+        ctx["active_filters"] = []
+        if params.get("q"):
+            ctx["active_filters"].append({"key": "q", "label": f'Search: "{params["q"]}"'})
+        if params.get("status"):
+            label = dict(Expense.Status.choices).get(params["status"], params["status"])
+            ctx["active_filters"].append({"key": "status", "label": f"Status: {label}"})
+        if params.get("fund_pool"):
+            pool = FundPool.objects.filter(pk=params["fund_pool"]).first()
+            if pool:
+                ctx["active_filters"].append({"key": "fund_pool", "label": f"Pool: {pool.name}"})
+        ctx["current_order"] = params.get("order_by", "")
+        return ctx
 
 
 class ExpenseCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
@@ -165,8 +270,6 @@ def expense_approve(request, pk):
     if ex.status not in ("pending", "pending_governance"):
         messages.error(request, "Invalid state.")
         return redirect("funding:expenses")
-    from apps.core.permissions import has_stakeholder_type
-
     if ex.status == "pending_governance" and not (
         request.user.is_superuser
         or has_stakeholder_type(

@@ -2,16 +2,48 @@
 {% load widget_tweaks %}
 {% block title %}Record contribution{% endblock %}
 {% block content %}
-<h1 class="mb-6 text-2xl font-bold">Record contribution</h1>
-<form method="post" class="max-w-xl space-y-4 rounded border bg-white p-6 shadow-sm">
+<h1 class="mb-2 text-2xl font-bold">Record contribution</h1>
+<p class="mb-6 text-sm text-slate-600">
+  Using rate: <strong>{{ exchange_rate_label }}</strong> (as of {{ exchange_rate_date|date:"F Y" }})
+</p>
+<form method="post" class="max-w-xl space-y-4 rounded border bg-white p-6 shadow-sm" id="contribution-form">
   {% csrf_token %}
   {% for field in form %}
     <div>
       <label class="block text-sm font-medium" for="{{ field.id_for_label }}">{{ field.label }}</label>
       {% render_field field class="mt-1 block w-full rounded border px-3 py-2" %}
-      {% if field.errors %}<p class="text-sm text-red-600">{{ field.errors.0 }}</p>{% endif %}
+      {% if field.errors %}<p class="field-error">{{ field.errors.0 }}</p>{% endif %}
     </div>
   {% endfor %}
+  <p id="usd-preview" class="rounded bg-slate-50 px-3 py-2 text-sm text-slate-700 hidden">
+    ≈ <strong id="usd-preview-amount">0.00</strong> USD
+  </p>
   <button type="submit" class="rounded bg-emerald-700 px-4 py-2 text-white">Save</button>
 </form>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  var rateInrPerUsd = {{ usd_inr_rate }};
+  var ratesToUsd = { USD: 1, INR: 1 / rateInrPerUsd };
+  var amountEl = document.getElementById('id_amount');
+  var currencyEl = document.getElementById('id_currency');
+  var preview = document.getElementById('usd-preview');
+  var previewAmt = document.getElementById('usd-preview-amount');
+  function updatePreview() {
+    if (!amountEl || !currencyEl || !preview) return;
+    var amt = parseFloat(amountEl.value);
+    if (isNaN(amt) || amt <= 0) {
+      preview.classList.add('hidden');
+      return;
+    }
+    var cur = (currencyEl.value || 'USD').toUpperCase();
+    var usd = amt * (ratesToUsd[cur] || 1);
+    previewAmt.textContent = usd.toFixed(2);
+    preview.classList.remove('hidden');
+  }
+  if (amountEl) amountEl.addEventListener('input', updatePreview);
+  if (currencyEl) currencyEl.addEventListener('change', updatePreview);
+})();
+</script>
 {% endblock %}

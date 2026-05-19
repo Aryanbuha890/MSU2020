@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit milestone{% else %}Add milestone{% endif %}{% endblock %}
+{% block content %}
+<nav class="breadcrumb">
+  <a href="{% url 'events:list' %}">Events</a>
+  <span class="breadcrumb-sep">›</span>
+  <a href="{% url 'events:detail' event.pk %}">{{ event.title }}</a>
+  <span class="breadcrumb-sep">›</span>
+  <span>{% if object %}Edit milestone{% else %}Add milestone{% endif %}</span>
+</nav>
+<h1 class="mb-6 text-2xl font-bold">{% if object %}Edit milestone{% else %}Add event milestone{% endif %}</h1>
+<p class="mb-4 text-sm text-slate-600">Event: <strong>{{ event.title }}</strong></p>
+<form method="post" class="max-w-xl space-y-4 rounded-xl border bg-white p-6 shadow-sm">
+  {% csrf_token %}
+  {% for field in form %}
+  <div>
+    <label class="block text-sm font-medium" for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field }}
+    {% if field.errors %}<p class="field-error">{{ field.errors.0 }}</p>{% endif %}
+  </div>
+  {% endfor %}
+  <div class="flex gap-3">
+    <button type="submit" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm text-white">Save</button>
+    <a href="{% url 'events:detail' event.pk %}" class="rounded-lg border px-4 py-2 text-sm text-slate-700">Cancel</a>
+  </div>
+</form>
+{% endblock %}

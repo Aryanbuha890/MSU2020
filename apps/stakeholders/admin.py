@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from apps.stakeholders.models import Organization, PendingUserRegistration, UserProfile, UserStakeholderPersona
+from apps.stakeholders.models import (
+    Organization,
+    PendingUserRegistration,
+    UserProfile,
+    UserRoleRequest,
+    UserStakeholderPersona,
+)
 
 
 @admin.register(PendingUserRegistration)
@@ -54,6 +60,14 @@ class UserProfileAdmin(admin.ModelAdmin):
     )
     list_filter = ("stakeholder_type", "needs_persona_assignment", "jurisdiction")
     search_fields = ("user__username", "user__email")
+
+
+@admin.register(UserRoleRequest)
+class UserRoleRequestAdmin(admin.ModelAdmin):
+    list_display = ("user", "requested_persona", "status", "created_at", "reviewed_by")
+    list_filter = ("status", "requested_persona")
+    search_fields = ("user__username", "user__email")
+    raw_id_fields = ("user", "reviewed_by")
 
 
 @admin.register(UserStakeholderPersona)
