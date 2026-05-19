@@ -2,6 +2,36 @@
 {% load widget_tweaks %}
 {% block title %}Project{% endblock %}
 {% block content %}
+{% if not object and view.need %}
+<nav class="mb-4 flex text-sm text-slate-500" aria-label="Breadcrumb">
+  <ol class="inline-flex items-center space-x-1 md:space-x-2">
+    <li class="inline-flex items-center">
+      <a class="inline-flex items-center font-semibold hover:text-emerald-700" href="{% url 'needs:list' %}">
+        Needs
+      </a>
+    </li>
+    <li>
+      <div class="flex items-center">
+        <svg class="mx-1 h-3.5 w-3.5 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+        </svg>
+        <a class="ml-1 font-semibold hover:text-emerald-700 max-w-[200px] truncate sm:max-w-xs" href="{% url 'needs:detail' view.need.pk %}">
+          {{ view.need.title }}
+        </a>
+      </div>
+    </li>
+    <li aria-current="page">
+      <div class="flex items-center">
+        <svg class="mx-1 h-3.5 w-3.5 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+        </svg>
+        <span class="ml-1 text-slate-700 font-medium">Create Project</span>
+      </div>
+    </li>
+  </ol>
+</nav>
+{% endif %}
+
 <h1 class="mb-6 text-2xl font-bold">{% if object %}Edit project{% else %}New project{% endif %}</h1>
 <form method="post" enctype="multipart/form-data" class="max-w-xl space-y-4 rounded-lg border bg-white p-6 shadow-sm">
   {% csrf_token %}
@@ -17,6 +47,17 @@
       {% if field.errors %}<p class="mt-1 text-sm text-red-600">{{ field.errors.0 }}</p>{% endif %}
     </div>
   {% endfor %}
+  {% if not form.program %}
+    <div>
+      <label class="block text-sm font-medium text-slate-700" for="id_program">Link to Program (Optional)</label>
+      <select id="id_program" name="program" class="mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+        <option value="">-- Select a Program (Optional) --</option>
+        <option value="1">Entrepreneurship Incubator & Infrastructure Program 2026</option>
+        <option value="2">Hostel Structural & Amenities Remodeling</option>
+      </select>
+      <p class="mt-1 text-xs text-slate-500">Associate this project with an overarching program for milestone and budget rollups.</p>
+    </div>
+  {% endif %}
   <div>
     <label class="block text-sm font-medium text-slate-700" for="id_attachments">Supporting documents</label>
     <input type="file" name="attachments" id="id_attachments" multiple

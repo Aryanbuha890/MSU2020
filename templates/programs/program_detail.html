@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}{{ program.title }} - Program Detail{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <a class="text-sm text-slate-500 hover:text-emerald-700" href="{% url 'programs:list' %}">← Programs</a>
+</div>
+
+<!-- Header Card -->
+<div class="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <div class="flex flex-wrap items-center gap-3">
+        <h1 class="text-2xl font-bold text-slate-900">{{ program.title }}</h1>
+        <span class="badge {% if program.status == 'active' or program.status == 'approved' %}badge-active{% elif program.status == 'draft' %}badge-slate{% elif program.status == 'completed' %}badge-blue{% else %}badge-amber{% endif %}">
+          {{ program.get_status_display|default:program.status }}
+        </span>
+      </div>
+      <p class="mt-3 text-slate-600 max-w-3xl">{{ program.description|linebreaksbr }}</p>
+    </div>
+    
+    <!-- Quick Info Panel -->
+    <div class="w-full sm:w-auto rounded-lg border border-slate-100 bg-slate-50 p-4 text-sm min-w-[240px]">
+      <div class="space-y-3">
+        <div>
+          <span class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Originated By</span>
+          <span class="font-medium text-slate-700">{{ program.originated_by.get_full_name|default:program.originated_by.username|default:"N/A" }}</span>
+        </div>
+        <div>
+          <span class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Program Budget</span>
+          <span class="font-bold text-slate-800 text-lg font-mono">{{ program.budget }} {{ program.budget_currency|default:"INR" }}</span>
+        </div>
+        <div>
+          <span class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Linked Pool</span>
+          <span class="font-medium text-emerald-800 hover:underline">
+            {% if program.fund_pool %}
+              <a href="{% url 'funding:pools' %}">{{ program.fund_pool.name|default:program.fund_pool }}</a>
+            {% else %}
+              <span class="text-slate-400">None</span>
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-6 flex flex-wrap gap-2 pt-4 border-t border-slate-100">
+    {% if can_edit_program or user.profile.stakeholder_type == 'foundation_admin' or user.profile.stakeholder_type == 'governance' or user.is_superuser %}
+      <a class="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 bg-white hover:bg-slate-50" href="{% url 'programs:edit' program.pk %}">Edit Program</a>
+    {% endif %}
+    {% if can_manage_milestones or user.profile.stakeholder_type == 'foundation_admin' or user.profile.stakeholder_type == 'governance' or user.is_superuser %}
+      <a class="rounded bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800" href="{% url 'programs:milestone_create' program.pk %}">Add Milestone</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Grid Layout for Content & Pool Utilization -->
+<div class="grid gap-8 lg:grid-cols-3">
+  <!-- Left/Main Column: Milestones and Projects -->
+  <div class="lg:col-span-2 space-y-8">
+    
+    <!-- Milestones Section -->
+    <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="mb-4 text-xl font-bold text-slate-900">Program Milestones</h2>
+      
+      {% if program.milestones.exists %}
+        <div class="space-y-6">
+          {% regroup program.milestones.all|dictsort:"phase" by phase as phase_list %}
+          {% for phase_group in phase_list %}
+            <div>
+              <h3 class="mb-3 text-sm font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-1">
+                {{ phase_group.grouper|default:"Unphased" }}
+              </h3>
+              
+              <div class="table-responsive">
+                <table class="w-full text-left text-sm">
+                  <thead>
+                    <tr class="border-b border-slate-100 text-slate-400 font-semibold text-xs">
+                      <th class="py-2.5">Milestone Title</th>
+                      <th class="py-2.5">Owner</th>
+                      <th class="py-2.5">Due Date</th>
+                      <th class="py-2.5 text-right">Tranche</th>
+                      <th class="py-2.5 text-center">Status</th>
+                      <th class="py-2.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    {% for m in phase_group.list %}
+                      <tr>
+                        <td class="py-3 pr-2">
+                          <div class="font-medium text-slate-900">{{ m.title }}</div>
+                          {% if m.notes %}
+                            <div class="text-xs text-slate-400 mt-0.5">{{ m.notes }}</div>
+                          {% endif %}
+                          {% if m.completion_proof %}
+                            <div class="mt-1">
+                              <a class="text-xs text-emerald-700 underline font-medium" href="{{ m.completion_proof.url|default:'#' }}">
+                                View Proof
+                              </a>
+                            </div>
+                          {% endif %}
+                        </td>
+                        <td class="py-3 text-slate-600 pr-2">
+                          {{ m.owner.get_full_name|default:m.owner.username|default:"Unassigned" }}
+                        </td>
+                        <td class="py-3 text-slate-500 font-mono text-xs pr-2">
+                          {{ m.due_date|date:"M j, Y"|default:m.due_date }}
+                        </td>
+                        <td class="py-3 text-right font-semibold text-violet-700 pr-2 font-mono">
+                          {{ m.tranche_percent }}%
+                        </td>
+                        <td class="py-3 text-center pr-2">
+                          <span class="badge {% if m.status == 'completed' or m.status == 'done' %}badge-active{% elif m.status == 'in_progress' %}badge-indigo{% else %}badge-slate{% endif %}">
+                            {{ m.get_status_display|default:m.status }}
+                          </span>
+                        </td>
+                        <td class="py-3 text-right">
+                          <div class="flex justify-end items-center gap-2">
+                            {% if m.tranche_percent > 0 and m.status == 'completed' or m.status == 'done' %}
+                              {% if not m.tranche_released %}
+                                {% if user.profile.stakeholder_type == 'foundation_admin' or user.profile.stakeholder_type == 'governance' or user.is_superuser %}
+                                  <form method="post" action="{% url 'programs:release_tranche' m.pk %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="rounded bg-violet-600 px-2 py-1 text-xs font-semibold text-white hover:bg-violet-700 transition">
+                                      Release Tranche
+                                    </button>
+                                  </form>
+                                {% endif %}
+                              {% else %}
+                                <span class="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                                  ✓ Released
+                                </span>
+                              {% endif %}
+                            {% endif %}
+                            {% if user.profile.stakeholder_type == 'foundation_admin' or user.profile.stakeholder_type == 'governance' or user.is_superuser %}
+                              <a class="text-xs text-slate-400 hover:text-emerald-700 font-medium" href="{% url 'programs:milestone_edit' m.pk %}">Edit</a>
+                            {% endif %}
+                          </div>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-slate-500 text-sm">No milestones have been defined for this program.</p>
+      {% endif %}
+    </section>
+
+    <!-- Linked Projects Section -->
+    <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="mb-4 text-xl font-bold text-slate-900">Incubator Projects</h2>
+      
+      {% if program.projects.all or program.incubated_projects.all %}
+        <div class="table-responsive">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-100 text-slate-400 font-semibold text-xs">
+                <th class="py-2.5">Project Name</th>
+                <th class="py-2.5">Lead</th>
+                <th class="py-2.5">Progress</th>
+                <th class="py-2.5 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for project in program.projects.all|default:program.incubated_projects.all %}
+                <tr class="hover:bg-slate-50/50 transition">
+                  <td class="py-3.5 pr-2">
+                    <a class="font-medium text-emerald-800 hover:underline" href="{{ project.get_absolute_url }}">{{ project.title }}</a>
+                  </td>
+                  <td class="py-3.5 text-slate-600 pr-2">
+                    {{ project.lead.get_full_name|default:project.lead.username|default:"Unassigned" }}
+                  </td>
+                  <td class="py-3.5 pr-2 max-w-[160px]">
+                    <div class="flex items-center gap-2">
+                      <div class="progress-bar max-w-[100px]">
+                        <div class="progress-fill {% if project.progress_pct < 25 %}progress-low{% elif project.progress_pct < 50 %}progress-mid{% elif project.progress_pct < 75 %}progress-high{% else %}progress-full{% endif %}" style="--progress: {{ project.progress_pct|default:0 }}%; width: var(--progress);"></div>
+                      </div>
+                      <span class="text-xs font-semibold text-slate-500 font-mono">{{ project.progress_pct|default:"0" }}%</span>
+                    </div>
+                  </td>
+                  <td class="py-3.5 text-center">
+                    <span class="badge {% if project.status == 'in_progress' %}badge-indigo{% elif project.status == 'completed' %}badge-active{% else %}badge-slate{% endif %}">
+                      {{ project.get_status_display|default:project.status }}
+                    </span>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-slate-500 text-sm">No incubator projects are currently linked to this program.</p>
+        {% if user.profile.stakeholder_type == 'foundation_admin' or user.is_superuser %}
+          <div class="mt-4">
+            <a class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline" href="{% url 'projects:list' %}">
+              Link a project from need →
+            </a>
+          </div>
+        {% endif %}
+      {% endif %}
+    </section>
+  </div>
+
+  <!-- Right/Sidebar Column: Pool Utilization -->
+  <div class="space-y-6">
+    <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="mb-4 text-lg font-bold text-slate-900">Pool Utilization</h2>
+      
+      {% if program.fund_pool %}
+        <div class="space-y-5">
+          <!-- Pool Card Status Stats -->
+          <div class="space-y-3">
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-500">Collected Funds</span>
+              <span class="font-bold text-emerald-600 font-mono">
+                {% if program.fund_pool.total_collected %}{{ program.fund_pool.total_collected }}{% else %}$0{% endif %}
+              </span>
+            </div>
+            
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-500">Allocated Budget</span>
+              <span class="font-bold text-amber-600 font-mono">
+                {% if program.fund_pool.total_allocated %}{{ program.fund_pool.total_allocated }}{% else %}$0{% endif %}
+              </span>
+            </div>
+            
+            <div class="flex justify-between items-center text-sm border-t border-slate-100 pt-2.5">
+              <span class="text-slate-800 font-semibold">Remaining Pool Balance</span>
+              <span class="font-bold text-blue-600 font-mono">
+                {% if program.fund_pool.remaining %}{{ program.fund_pool.remaining }}{% else %}$0{% endif %}
+              </span>
+            </div>
+          </div>
+          
+          <!-- Utilization Progress -->
+          {% if program.fund_pool.total_collected and program.fund_pool.total_allocated %}
+            <div class="pt-2 border-t border-slate-100">
+              <div class="mb-1.5 flex justify-between text-xs text-slate-400">
+                <span>Utilization Rate</span>
+                <span class="font-semibold text-slate-600">
+                  {{ program.fund_pool_utilization_pct|default:"0" }}%
+                </span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill {% if program.fund_pool_utilization_pct < 50 %}progress-full{% elif program.fund_pool_utilization_pct < 80 %}progress-mid{% else %}progress-low{% endif %}" style="--progress: {{ program.fund_pool_utilization_pct|default:0 }}%; width: var(--progress);"></div>
+              </div>
+              <p class="text-[10px] text-slate-400 mt-2">
+                Green (&lt;50%), Amber (50-80%), Red (&gt;80%) pool consumption.
+              </p>
+            </div>
+          {% endif %}
+        </div>
+      {% else %}
+        <p class="text-slate-500 text-sm">No fund pool linked to this program.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}
