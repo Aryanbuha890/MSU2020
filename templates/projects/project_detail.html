@@ -5,6 +5,11 @@
 <h1 class="text-2xl font-bold">{{ project.title }}</h1>
 <p class="mt-2 text-slate-600">{{ project.description|linebreaksbr }}</p>
 <p class="mt-2 text-sm text-slate-500">Need: <a class="text-emerald-700 hover:underline" href="{{ project.need.get_absolute_url }}">{{ project.need.title }}</a></p>
+{% if project.program %}
+<p class="mt-2 text-sm text-slate-500">
+  Part of Program: <a class="text-emerald-700 hover:underline font-semibold" href="{% url 'programs:detail' project.program.pk %}">{{ project.program.title }}</a>
+</p>
+{% endif %}
 <div class="mt-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
   <div class="font-medium text-slate-800">Project lead</div>
   <div class="mt-0.5 text-slate-700">
@@ -36,7 +41,7 @@
 <div class="mt-4">
   <div class="mb-1 flex justify-between text-sm"><span>Progress</span><span>{{ progress_pct }}%</span></div>
   <div class="h-3 w-full max-w-md rounded bg-slate-200">
-    <div class="h-3 rounded bg-emerald-600 transition-all" style="width: {{ progress_pct }}%"></div>
+    <div class="h-3 rounded bg-emerald-600 transition-all" style="--progress: {{ progress_pct }}%; width: var(--progress);"></div>
   </div>
 </div>
 {% if funding_gate_metrics.tranches_total_pct %}
@@ -45,10 +50,10 @@
   <p class="mb-2 text-xs text-violet-900/80">Tranche % is set per milestone; proof + governance release moves it from pending to funded.</p>
   <div class="mb-2 flex h-3 w-full overflow-hidden rounded bg-slate-200">
     {% with g=funding_gate_metrics %}
-    <div class="h-3 bg-emerald-600" style="width: {{ g.released_pct }}%" title="Released"></div>
-    <div class="h-3 bg-amber-400" style="width: {{ g.pending_governance_pct }}%" title="Awaiting governance"></div>
-    {% if g.rejected_pct %}<div class="h-3 bg-red-400" style="width: {{ g.rejected_pct }}%" title="Rejected"></div>{% endif %}
-    <div class="h-3 bg-slate-300" style="width: {{ g.upcoming_pct }}%" title="Upcoming"></div>
+    <div class="h-3 bg-emerald-600" style="--released: {{ g.released_pct }}%; width: var(--released);" title="Released"></div>
+    <div class="h-3 bg-amber-400" style="--pending: {{ g.pending_governance_pct }}%; width: var(--pending);" title="Awaiting governance"></div>
+    {% if g.rejected_pct %}<div class="h-3 bg-red-400" style="--rejected: {{ g.rejected_pct }}%; width: var(--rejected);" title="Rejected"></div>{% endif %}
+    <div class="h-3 bg-slate-300" style="--upcoming: {{ g.upcoming_pct }}%; width: var(--upcoming);" title="Upcoming"></div>
     {% endwith %}
   </div>
   <ul class="grid gap-1 text-xs text-slate-700 sm:grid-cols-2">

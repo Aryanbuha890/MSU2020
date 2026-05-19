@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Programs{% endblock %}
+{% block content %}
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+  <h1 class="text-2xl font-bold">Programs</h1>
+  {% if can_create_program or user.profile.stakeholder_type == 'foundation_admin' or user.profile.stakeholder_type == 'governance' or user.is_superuser %}
+  <a class="rounded bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800" href="{% url 'programs:create' %}">Create Program</a>
+  {% endif %}
+</div>
+
+<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+  {% for program in programs %}
+    <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm card-hover flex flex-col justify-between">
+      <div>
+        <div class="flex items-start justify-between gap-2">
+          <h2 class="font-semibold text-slate-900 text-lg">
+            <a class="text-emerald-800 hover:underline" href="{% url 'programs:detail' program.pk %}">{{ program.title }}</a>
+          </h2>
+          <span class="badge {% if program.status == 'active' or program.status == 'approved' %}badge-active{% elif program.status == 'draft' %}badge-slate{% elif program.status == 'completed' %}badge-blue{% else %}badge-amber{% endif %}">
+            {{ program.get_status_display|default:program.status }}
+          </span>
+        </div>
+        <p class="mt-2 text-sm text-slate-600 line-clamp-3">{{ program.description }}</p>
+        
+        <div class="mt-4 space-y-2.5 border-t border-slate-100 pt-4 text-xs text-slate-500">
+          <div class="flex justify-between">
+            <span class="font-medium text-slate-400">Current Phase:</span>
+            <span class="font-semibold text-slate-700">{{ program.phase|default:"Phase 1" }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="font-medium text-slate-400">Fund Pool:</span>
+            <span class="font-semibold text-slate-700">{{ program.fund_pool.name|default:program.fund_pool }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="font-medium text-slate-400">Budget:</span>
+            <span class="font-semibold text-slate-800 font-mono">{{ program.budget }} {{ program.budget_currency|default:"INR" }}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="mt-5 pt-3 border-t border-slate-100">
+        <div class="mb-1 flex justify-between text-xs text-slate-500">
+          <span>Progress</span>
+          <span class="font-semibold">{{ program.progress_pct|default:"0" }}%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill {% if program.progress_pct < 25 %}progress-low{% elif program.progress_pct < 50 %}progress-mid{% elif program.progress_pct < 75 %}progress-high{% else %}progress-full{% endif %}" style="--progress: {{ program.progress_pct|default:0 }}%; width: var(--progress);"></div>
+        </div>
+      </div>
+    </div>
+  {% empty %}
+    <div class="col-span-full rounded-lg border-2 border-dashed border-slate-200 py-12 text-center">
+      <p class="text-slate-500">No programs registered yet.</p>
+      {% if can_create_program or user.profile.stakeholder_type == 'foundation_admin' or user.profile.stakeholder_type == 'governance' or user.is_superuser %}
+      <p class="mt-2 text-sm text-slate-400">Get started by creating a new program.</p>
+      <a class="mt-4 inline-block rounded bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800" href="{% url 'programs:create' %}">Create Program</a>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}
