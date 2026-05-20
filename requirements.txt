@@ -11,3 +11,6 @@ cryptography>=42.0
 gunicorn>=22.0
 whitenoise>=6.6
 Pillow>=10.0
+django-simple-history>=3.5
+python-magic>=0.4
+pyclamd>=0.4

@@ -9,6 +9,8 @@ from django.contrib.auth import get_user_model
 
 from apps.stakeholders.models import Organization, UserProfile, UserStakeholderPersona
 
+from django.conf import settings
+
 User = get_user_model()
 
 # Highest-privilege first (used for profile.stakeholder_type display / legacy single field)
@@ -214,11 +216,14 @@ def parse_profile_upload_csv(file_obj) -> Tuple[Optional[List[dict]], Optional[s
                 col_map[canonical] = fields_lower[a]
                 break
 
-    rows = []
+    parsed_rows = []
+    limit = getattr(settings, "CSV_UPLOAD_MAX_ROWS", 500)
     for r in reader:
         row = {k: (r.get(col_map[k]) or "").strip() if k in col_map else "" for k in col_map}
-        rows.append(row)
-    return rows, None
+        parsed_rows.append(row)
+        if len(parsed_rows) > limit:
+            return None, f"File exceeds maximum allowed rows ({limit})."
+    return parsed_rows, None
 
 
 def sample_csv_text() -> str:

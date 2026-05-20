@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from simple_history.models import HistoricalRecords
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -39,6 +40,9 @@ class UserProfile(TimeStampedModel):
         FINANCE_CONTROLLER = "finance_controller", "Finance Controller"
         GOVERNANCE = "governance", "Governance Team"
         AUDITOR = "auditor", "Auditor"
+        STUDENT_BENEFICIARY = "student_beneficiary", "Student Beneficiary"
+        CSR_CORPORATE_DONOR = "csr_corporate_donor", "CSR / Corporate Donor"
+        PROGRAM_MANAGER = "program_manager", "Program Manager"
 
     class Jurisdiction(models.TextChoices):
         INDIA = "india", "India"
@@ -64,10 +68,11 @@ class UserProfile(TimeStampedModel):
         default=False,
         help_text="True when imported or created without confirmed personas — show in governance roster until cleared.",
     )
+    history = HistoricalRecords()
 
     def persona_codes(self):
         """Effective RBAC persona codes (multi-persona). Empty when flagged and no links yet."""
-        codes = set(self.user.stakeholder_personas.values_list("persona_type", flat=True))
+        codes = set(self.user.stakeholder_personas.filter(is_active=True).values_list("persona_type", flat=True))
         if codes:
             return codes
         if self.needs_persona_assignment:
@@ -97,6 +102,16 @@ class UserStakeholderPersona(TimeStampedModel):
         related_name="stakeholder_personas",
     )
     persona_type = models.CharField(max_length=32, choices=UserProfile.StakeholderType.choices)
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="persona_assignments"
+    )
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ["user_id", "persona_type"]

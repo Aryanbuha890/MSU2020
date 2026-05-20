@@ -1,6 +1,7 @@
 from django.urls import path
 
 from apps.dashboard import views
+from apps.core import views as core_views
 
 app_name = "dashboard"
 
@@ -25,5 +26,7 @@ urlpatterns = [
     ),
     path("switch-role/", views.switch_role, name="switch_role"),
     path("toggle-currency/", views.toggle_currency, name="toggle_currency"),
-    path("audit/uploads/", views.UploadAuditLogView.as_view(), name="upload_audit_log"),
+    path("audit/uploads/", core_views.UploadAuditLogListView.as_view(), name="upload_audit_log"),
+    path("audit/trail/", core_views.AuditTrailView.as_view(), name="audit_trail"),
+    path("audit/trail/export/", core_views.export_audit_trail_csv, name="export_audit_trail_csv"),
 ]

@@ -12,12 +12,15 @@ from django.contrib.sites.models import Site
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
 
 from apps.events.models import Event, EventMedia, EventRegistration
 from apps.funding.models import Contribution, Expense, FundPool
 from apps.needs.models import Need
 from apps.projects.models import Milestone, Project, ProjectTeam
-from apps.stakeholders.models import Organization, UserProfile
+from apps.programs.models import Program, ProgramMilestone
+from apps.stakeholders.models import Organization, UserProfile, UserRoleRequest
+from apps.core.models import UploadAuditLog
 from apps.stakeholders.persona_utils import replace_user_personas
 
 User = get_user_model()
@@ -373,6 +376,88 @@ Post-event: thank-you, publish photos, reconcile pledges."""
             event=gala,
             user=donor_james,
             defaults={"role": EventRegistration.Role.ATTENDEE},
+        )
+
+        from apps.events.models import EventMilestone
+        EventMilestone.objects.get_or_create(
+            event=gala,
+            title="Venue deposit paid",
+            defaults={
+                "due_date": date(2026, 2, 28),
+                "completed": True,
+                "completed_date": date(2026, 2, 25),
+                "owner": admin
+            }
+        )
+        EventMilestone.objects.get_or_create(
+            event=gala,
+            title="Publish sponsor packages",
+            defaults={
+                "due_date": date(2026, 4, 15),
+                "completed": False,
+                "owner": admin
+            }
+        )
+
+        prog_hostel, _ = Program.objects.get_or_create(
+            title="Hostel Modernization Initiative",
+            defaults={
+                "description": "Umbrella program for all hostel renovations.",
+                "fund_pool": india,
+                "budget": Decimal("50000000"),
+                "budget_currency": "INR",
+                "start_date": date(2025, 1, 1),
+                "end_date": date(2028, 12, 31),
+                "status": Program.Status.ACTIVE,
+                "originated_by": hod_hostel,
+            }
+        )
+        prog_hostel.owners.set([hod_hostel, lead_hostel])
+        if proj_hostel.program != prog_hostel:
+            proj_hostel.program = prog_hostel
+            proj_hostel.save(update_fields=["program"])
+
+        ProgramMilestone.objects.get_or_create(
+            program=prog_hostel,
+            title="Boys Hostel Block A Funding Secured",
+            defaults={
+                "phase": "Funding",
+                "due_date": date(2025, 12, 31),
+                "completed": True,
+                "owner": lead_hostel,
+                "tranche_percent": 20
+            }
+        )
+
+        UserRoleRequest.objects.get_or_create(
+            user=volunteer_riya,
+            requested_persona=UserProfile.StakeholderType.PROJECT_LEAD,
+            defaults={
+                "reason": "Requesting lead role for upcoming project.",
+                "status": UserRoleRequest.Status.PENDING
+            }
+        )
+        UserRoleRequest.objects.get_or_create(
+            user=demo_u,
+            requested_persona=UserProfile.StakeholderType.GOVERNANCE,
+            defaults={
+                "reason": "Approved for governance.",
+                "status": UserRoleRequest.Status.APPROVED,
+                "reviewed_by": admin,
+                "reviewed_at": timezone.now()
+            }
+        )
+
+        UploadAuditLog.objects.get_or_create(
+            filename="anita-hostel-80g-letter.pdf",
+            uploader=admin,
+            defaults={
+                "upload_type": "communication_capture",
+                "file_size": 250000,
+                "actual_mime": "application/pdf",
+                "scan_result": UploadAuditLog.ScanResult.CLEAN,
+                "action_taken": UploadAuditLog.ActionTaken.ACCEPTED
+            }
         )
 
         # Stewardship / receipt / comms capture (idempotent updates)

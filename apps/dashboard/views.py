@@ -196,7 +196,24 @@ class ProjectRollupView(LoginRequiredMixin, TemplateView):
             UserProfile.StakeholderType.GOVERNANCE,
             UserProfile.StakeholderType.FOUNDATION_ADMIN,
         }
-        ctx["program_rows"] = []
+        program_rows = []
+        if ctx["show_programs_section"]:
+            from apps.programs.models import Program
+            from apps.programs.visibility import filter_programs_for_user
+            progs = filter_programs_for_user(Program.objects.all(), self.request.user).prefetch_related('milestones', 'projects')
+            for prog in progs:
+                milestones = list(prog.milestones.all())
+                total_ms = len(milestones)
+                completed_ms = sum(1 for m in milestones if m.completed)
+                progress = int((completed_ms / total_ms) * 100) if total_ms > 0 else 0
+                program_rows.append({
+                    "program": prog,
+                    "progress_pct": progress,
+                    "milestones_total": total_ms,
+                    "milestones_completed": completed_ms,
+                    "incubator_projects": prog.projects.all()
+                })
+        ctx["program_rows"] = program_rows
         return ctx
 
 
@@ -283,7 +300,17 @@ def governance_profile_bulk_upload(request):
         for err in form.errors.get("csv_file", ["Invalid upload."]):
             messages.error(request, err)
         return redirect("dashboard:governance_queue")
-    rows, err = parse_profile_upload_csv(form.cleaned_data["csv_file"])
+    
+    csv_file = form.cleaned_data["csv_file"]
+    from apps.core.upload_security import process_upload
+    from django.core.exceptions import ValidationError
+    try:
+        process_upload(csv_file, request.user, "csv_import", allowed_mimes=["text/csv", "application/csv", "application/vnd.ms-excel"])
+    except ValidationError as e:
+        messages.error(request, str(e.message) if hasattr(e, 'message') else str(e))
+        return redirect("dashboard:governance_queue")
+
+    rows, err = parse_profile_upload_csv(csv_file)
     if err:
         messages.error(request, err)
         return redirect("dashboard:governance_queue")
@@ -340,7 +367,11 @@ def governance_csv_confirm(request):
 
 
 def _build_csv_preview(rows: list[dict]) -> dict:
-    from apps.stakeholders.persona_utils import parse_persona_cell
+    from apps.stakeholders.persona_utils import parse_persona_cell, _norm_jurisdiction
+    from django.core.validators import validate_email
+    from django.core.exceptions import ValidationError
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
 
     flagged = []
     errors = []
@@ -351,6 +382,23 @@ def _build_csv_preview(rows: list[dict]) -> dict:
         if not username or not email:
             errors.append({"row": i, "username": username or "—", "reason": "Missing username or email"})
             continue
+            
+        try:
+            validate_email(email)
+        except ValidationError:
+            errors.append({"row": i, "username": username, "reason": "Invalid email format"})
+            continue
+
+        existing_user = User.objects.filter(username__iexact=username).first()
+        if existing_user and existing_user.email.lower() != email.lower():
+             errors.append({"row": i, "username": username, "reason": "Username exists with different email"})
+             continue
+
+        email_taken = User.objects.filter(email__iexact=email).exclude(username__iexact=username).exists()
+        if email_taken:
+             errors.append({"row": i, "username": username, "reason": "Email already used by another username"})
+             continue
+
         personas_raw = row.get("personas") or ""
         valid_p, unknown = parse_persona_cell(personas_raw)
         if unknown:
@@ -361,6 +409,12 @@ def _build_csv_preview(rows: list[dict]) -> dict:
             flagged.append({"row": i, "username": username, "reason": "No personas — will need assignment"})
         else:
             valid_count += 1
+            
+        jur = row.get("jurisdiction")
+        if jur and _norm_jurisdiction(jur) == "india" and jur.strip().lower() != "india":
+            # Just an example check, _norm_jurisdiction falls back to INDIA
+            pass
+
     return {
         "valid_count": valid_count,
         "flagged_count": len(flagged),
@@ -391,32 +445,6 @@ def toggle_currency(request):
     request.session["display_currency"] = "INR" if current == "USD" else "USD"
     return redirect("dashboard:home")
 
-
-class UploadAuditLogView(LoginRequiredMixin, TemplateView):
-    template_name = "core/upload_audit_log.html"
-
-    def dispatch(self, request, *args, **kwargs):
-        if not (
-            request.user.is_superuser
-            or has_stakeholder_type(
-                request.user,
-                UserProfile.StakeholderType.FOUNDATION_ADMIN,
-                UserProfile.StakeholderType.GOVERNANCE,
-                UserProfile.StakeholderType.AUDITOR,
-            )
-        ):
-            return redirect("dashboard:home")
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["audit_entries"] = []
-        u = self.request.user
-        ctx["read_only"] = not (
-            u.is_superuser
-            or has_stakeholder_type(u, UserProfile.StakeholderType.FOUNDATION_ADMIN)
-        )
-        return ctx
 
 
 def governance_profile_sample_csv(request):

@@ -42,6 +42,8 @@ INSTALLED_APPS = [
     "apps.funding.apps.FundingConfig",
     "apps.events.apps.EventsConfig",
     "apps.dashboard.apps.DashboardConfig",
+    "apps.programs.apps.ProgramsConfig",
+    "simple_history",
 ]
 
 MIDDLEWARE = [
@@ -56,6 +58,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -150,5 +153,15 @@ MVP_EXCHANGE_RATES_TO_USD = {
     "USD": "1",
     "INR": "0.012",
 }
+
+# SES email (production)
+AWS_SES_REGION_NAME = env("AWS_SES_REGION", default="us-east-1")
+
+# File security
+UPLOAD_MAX_DOCUMENT_BYTES = 10 * 1024 * 1024  # 10MB
+UPLOAD_MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5MB
+CSV_UPLOAD_MAX_ROWS = 500
+CLAMAV_HOST = env("CLAMAV_HOST", default="localhost")
+CLAMAV_PORT = env.int("CLAMAV_PORT", default=3310)
 
 FEATURE_EMAIL_INGESTION = env.bool("FEATURE_EMAIL_INGESTION", default=False)

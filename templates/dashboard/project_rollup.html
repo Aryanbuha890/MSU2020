@@ -68,8 +68,50 @@
         </tr>
       </thead>
       <tbody>
-        {% for prog in program_rows %}
-        <tr class="border-b"><td class="p-3" colspan="6">{{ prog.title }}</td></tr>
+        {% for row in program_rows %}
+        <tr class="border-b hover:bg-slate-50">
+          <td class="p-3 font-medium">
+            <a class="text-emerald-700 hover:underline" href="{{ row.program.get_absolute_url }}">{{ row.program.title }}</a>
+          </td>
+          <td class="p-3 text-slate-600">
+            {% with next_ms=row.program.milestones.all|dictsort:"sequence" %}
+              {% for ms in next_ms %}
+                {% if not ms.completed %}
+                  {% if forloop.first %}{{ ms.phase }}{% endif %}
+                {% endif %}
+              {% endfor %}
+            {% endwith %}
+          </td>
+          <td class="p-3 w-40">
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: {{ row.progress_pct }}%"></div>
+            </div>
+            <span class="text-xs text-slate-500">{{ row.progress_pct }}%</span>
+          </td>
+          <td class="p-3">
+            {% if row.program.fund_pool %}
+              <a class="text-emerald-700 hover:underline" href="{% url 'funding:pools' %}">{{ row.program.fund_pool.name }}</a>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td class="p-3"><span class="badge badge-{{ row.program.status }}">{{ row.program.get_status_display }}</span></td>
+          <td class="p-3 text-slate-500">{{ row.milestones_completed }}/{{ row.milestones_total }}</td>
+        </tr>
+        {% if row.incubator_projects.all %}
+        <tr class="bg-slate-50/50">
+          <td colspan="6" class="p-0">
+            <div class="px-6 py-2">
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Incubator projects</p>
+              <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                {% for p in row.incubator_projects.all %}
+                <a class="text-xs text-emerald-800 hover:underline" href="{{ p.get_absolute_url }}">{{ p.title }}</a>
+                {% endfor %}
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% endif %}
         {% endfor %}
       </tbody>
     </table>
