@@ -230,6 +230,13 @@ def event_milestone_complete(request, event_id, milestone_id):
         return redirect("events:detail", pk=event_id)
     proof = request.FILES.get("proof")
     if proof:
+        from apps.core.upload_security import process_upload
+        from django.core.exceptions import ValidationError
+        try:
+            process_upload(proof, request.user, "event_milestone_proof")
+        except ValidationError as e:
+            messages.error(request, str(e.message) if hasattr(e, 'message') else str(e))
+            return redirect("events:detail", pk=event_id)
         ms.proof = proof
         ms.proof_original_filename = proof.name
     ms.completed = True

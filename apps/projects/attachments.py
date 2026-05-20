@@ -58,10 +58,12 @@ def validate_project_attachment_files(file_list):
 
 def save_project_attachments(project, file_list, user):
     from apps.projects.models import ProjectAttachment
+    from apps.core.upload_security import process_upload
 
     count = 0
     for f in file_list:
         validate_project_attachment_file(f)
+        process_upload(f, user, "project_attachment", max_bytes=MAX_ATTACHMENT_BYTES)
         safe = get_valid_filename(os.path.basename(f.name))
         ProjectAttachment.objects.create(
             project=project, file=f, uploaded_by=user, original_filename=safe or "document"

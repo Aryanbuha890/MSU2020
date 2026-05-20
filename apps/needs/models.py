@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.validators import FileExtensionValidator
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 from apps.core.models import TimeStampedModel
 from apps.needs.attachments import need_attachment_upload_to
@@ -58,6 +59,7 @@ class Need(TimeStampedModel):
         related_name="owned_needs",
         help_text="At least one registered user accountable for this need (governance, delivery).",
     )
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ["-created_at"]

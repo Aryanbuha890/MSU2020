@@ -83,9 +83,10 @@ class MilestoneForm(forms.ModelForm):
             "completion_notes",
         ]
 
-    def __init__(self, *args, project=None, **kwargs):
+    def __init__(self, *args, project=None, user=None, **kwargs):
         inst = kwargs.get("instance")
         self._previous_status = inst.status if inst and getattr(inst, "pk", None) else None
+        self._user = user
         super().__init__(*args, **kwargs)
         self.fields["assigned_to"].required = False
         self.fields["assigned_to"].label = "Milestone lead"
@@ -109,6 +110,10 @@ class MilestoneForm(forms.ModelForm):
         f = self.cleaned_data.get("completion_proof")
         if f:
             validate_milestone_proof_file(f)
+            from apps.core.upload_security import process_upload
+            from apps.projects.attachments import MAX_MILESTONE_PROOF_BYTES
+            if hasattr(f, 'file'):  # only process if it's an uploaded file (UploadedFile has 'file' attr, FieldFile doesn't usually get cleaned this way if not updated)
+                process_upload(f, self._user, "milestone_proof", max_bytes=MAX_MILESTONE_PROOF_BYTES)
         return f
 
     def clean(self):

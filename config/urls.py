@@ -15,6 +15,7 @@ urlpatterns = [
     path("projects/", include("apps.projects.urls")),
     path("funding/", include("apps.funding.urls")),
     path("events/", include("apps.events.urls")),
+    path("programs/", include("apps.programs.urls")),
 ]
 
 if settings.DEBUG:

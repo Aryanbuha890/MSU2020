@@ -36,10 +36,12 @@ def validate_need_attachment_files(file_list):
 
 def save_need_attachments(need, file_list, user):
     from apps.needs.models import NeedAttachment
+    from apps.core.upload_security import process_upload
 
     count = 0
     for f in file_list:
         validate_need_attachment_file(f)
+        process_upload(f, user, "need_attachment", max_bytes=MAX_ATTACHMENT_BYTES)
         safe = get_valid_filename(os.path.basename(f.name))
         NeedAttachment.objects.create(need=need, file=f, uploaded_by=user, original_filename=safe or "document")
         count += 1

@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 from apps.core.models import TimeStampedModel
 
@@ -13,6 +14,12 @@ def _to_usd(amount: Decimal, currency: str) -> Decimal:
     return (amount or Decimal("0")) * rate
 
 
+def _get_rate(currency: str) -> Decimal:
+    currency = (currency or "USD").upper()
+    rates = getattr(settings, "MVP_EXCHANGE_RATES_TO_USD", {"USD": "1", "INR": "0.012"})
+    return Decimal(str(rates.get(currency, "1")))
+
+
 class FundPool(TimeStampedModel):
     class Jurisdiction(models.TextChoices):
         INDIA = "india", "India CSR pool"
@@ -21,12 +28,37 @@ class FundPool(TimeStampedModel):
     jurisdiction = models.CharField(max_length=8, choices=Jurisdiction.choices)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ["jurisdiction", "name"]
 
     def __str__(self):
         return self.name
+
+    def total_collected_usd(self) -> Decimal:
+        from django.db.models import Sum
+        result = self.contributions.filter(
+            status__in=["received", "allocated", "utilized"]
+        ).aggregate(Sum("amount_usd"))["amount_usd__sum"]
+        return result or Decimal("0")
+
+    def total_allocated_usd(self) -> Decimal:
+        from django.db.models import Sum
+        result = self.expenses.filter(
+            status__in=["approved", "disbursed"]
+        ).aggregate(Sum("amount_usd"))["amount_usd__sum"]
+        return result or Decimal("0")
+
+    def total_remaining_usd(self) -> Decimal:
+        return self.total_collected_usd() - self.total_allocated_usd()
+
+    def utilization_percent(self) -> int:
+        collected = self.total_collected_usd()
+        if collected == 0:
+            return 0
+        allocated = self.total_allocated_usd()
+        return int((allocated / collected) * 100)
 
 
 class Contribution(TimeStampedModel):
@@ -88,9 +120,17 @@ class Contribution(TimeStampedModel):
     )
     reference_number = models.CharField(max_length=128, blank=True)
     notes = models.TextField(blank=True)
+    exchange_rate_used = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True)
+    exchange_rate_date = models.DateField(null=True, blank=True)
+    history = HistoricalRecords()
 
     def save(self, *args, **kwargs):
-        self.amount_usd = _to_usd(self.amount, self.currency)
+        from django.utils import timezone
+        rate = _get_rate(self.currency)
+        self.exchange_rate_used = rate
+        if not self.exchange_rate_date:
+            self.exchange_rate_date = timezone.now().date()
+        self.amount_usd = (self.amount or Decimal("0")) * rate
         super().save(*args, **kwargs)
 
     class Meta:
@@ -133,6 +173,7 @@ class Expense(TimeStampedModel):
         related_name="owned_expenses",
         help_text="Registered users accountable for this expense / approval thread (e.g. requester + finance).",
     )
+    history = HistoricalRecords()
 
     def save(self, *args, **kwargs):
         self.amount_usd = _to_usd(self.amount, self.currency)

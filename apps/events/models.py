@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 from apps.core.models import TimeStampedModel
 
@@ -55,6 +56,10 @@ class Event(TimeStampedModel):
     )
     target_audience = models.TextField(blank=True)
     is_fundraising = models.BooleanField(default=False)
+    originated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="events_originated"
+    )
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ["start_datetime"]

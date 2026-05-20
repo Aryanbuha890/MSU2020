@@ -265,6 +265,7 @@ class MilestoneCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     def get_form_kwargs(self):
         kw = super().get_form_kwargs()
         kw["project"] = self.project
+        kw["user"] = self.request.user
         return kw
 
     def form_valid(self, form):
@@ -290,6 +291,7 @@ class MilestoneUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     def get_form_kwargs(self):
         kw = super().get_form_kwargs()
         kw["project"] = self.get_object().project
+        kw["user"] = self.request.user
         return kw
 
     def get_success_url(self):

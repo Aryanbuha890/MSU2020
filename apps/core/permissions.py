@@ -51,6 +51,8 @@ def has_role(user, *allowed):
     return has_stakeholder_type(user, *allowed)
 
 
+from django.core.exceptions import PermissionDenied
+
 def roles_required(*allowed_roles):
     def decorator(view_func):
         @wraps(view_func)
@@ -58,9 +60,11 @@ def roles_required(*allowed_roles):
             if not request.user.is_authenticated:
                 return redirect_to_login(request.get_full_path())
             if not has_role(request.user, *allowed_roles):
-                return redirect("dashboard:home")
+                raise PermissionDenied
             return view_func(request, *args, **kwargs)
 
         return _wrapped
 
     return decorator
+
+persona_required = roles_required

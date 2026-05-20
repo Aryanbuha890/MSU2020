@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.validators import FileExtensionValidator
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 from apps.core.models import TimeStampedModel
 from apps.projects.attachments import milestone_proof_upload_to, project_attachment_upload_to
@@ -25,6 +26,9 @@ class Project(TimeStampedModel):
         REJECTED = "rejected", "Rejected"
 
     need = models.ForeignKey("needs.Need", on_delete=models.PROTECT, related_name="projects")
+    program = models.ForeignKey(
+        "programs.Program", null=True, blank=True, on_delete=models.SET_NULL, related_name="projects"
+    )
     lead = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="projects_led"
     )
@@ -49,6 +53,7 @@ class Project(TimeStampedModel):
         related_name="owned_projects",
         help_text="At least one registered user accountable for delivery and approvals.",
     )
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ["-created_at"]
@@ -152,6 +157,7 @@ class Milestone(TimeStampedModel):
         related_name="owned_milestones",
         help_text="At least one registered user accountable for this milestone.",
     )
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ["project", "sequence", "id"]
