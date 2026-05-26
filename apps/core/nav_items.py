@@ -104,7 +104,7 @@ def _resolve_url(url_name: str) -> str | None:
         return None
 
 
-def nav_items_for_user(user, request_path: str = "") -> tuple[list[dict], list[dict]]:
+def nav_items_for_user(user, request_path: str = "", active_persona: str | None = None) -> tuple[list[dict], list[dict]]:
     """
     Return (primary_nav_items, more_nav_items) for the authenticated user.
     Each item: {url, label, active, key}
@@ -115,6 +115,9 @@ def nav_items_for_user(user, request_path: str = "") -> tuple[list[dict], list[d
     codes = user_stakeholder_codes(user)
     if user.is_superuser:
         codes = codes | {UserProfile.StakeholderType.FOUNDATION_ADMIN}
+
+    if active_persona and active_persona in codes:
+        codes = {active_persona}
 
     ordered_keys: list[str] = []
     seen: set[str] = set()

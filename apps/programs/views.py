@@ -13,7 +13,12 @@ from .visibility import can_manage_program, filter_programs_for_user
 
 class ProgramAccessMixin(UserPassesTestMixin):
     def test_func(self):
-        program = self.get_object() if hasattr(self, 'get_object') else None
+        program = None
+        if hasattr(self, 'get_object'):
+            try:
+                program = self.get_object()
+            except AttributeError:
+                pass
         return can_manage_program(self.request.user, program)
 
 
