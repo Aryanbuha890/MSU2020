@@ -69,7 +69,7 @@ class RoleRequestForm(forms.ModelForm):
         choices = [
             (c, label)
             for c, label in UserProfile.StakeholderType.choices
-            if c not in held
+            if c not in held and c != UserProfile.StakeholderType.FOUNDATION_ADMIN
         ]
         self.fields["requested_persona"].choices = [("", "Select a role…"), *choices]
         self.user = user
@@ -89,35 +89,29 @@ class RoleRequestForm(forms.ModelForm):
         return persona
 
 
-class NewUserRegistrationForm(forms.ModelForm):
+class NewUserRegistrationForm(forms.Form):
+    first_name = forms.CharField(max_length=150, widget=forms.TextInput(attrs={"class": _INPUT}))
+    last_name = forms.CharField(max_length=150, widget=forms.TextInput(attrs={"class": _INPUT}))
+    email = forms.EmailField(widget=forms.EmailInput(attrs={"class": _INPUT}))
+    password = forms.CharField(widget=forms.PasswordInput(attrs={"class": _INPUT}))
+    batch_year = forms.IntegerField(required=False, widget=forms.NumberInput(attrs={"class": _INPUT}))
+    phone = forms.CharField(max_length=32, required=False, widget=forms.TextInput(attrs={"class": _INPUT}))
+    linkedin_url = forms.URLField(required=True, label="LinkedIn profile URL", widget=forms.URLInput(attrs={"class": _INPUT}))
     desired_role_codes = forms.MultipleChoiceField(
         label="Roles desired",
         choices=UserProfile.StakeholderType.choices,
-        widget=forms.CheckboxSelectMultiple,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "space-y-2"}),
         required=True,
-        help_text="Select all that apply. The team will review and assign appropriate access.",
+        help_text="Select roles you are interested in. You will be able to request them from your dashboard.",
     )
-
-    class Meta:
-        model = PendingUserRegistration
-        fields = ["full_name", "email", "batch_year", "phone", "address", "linkedin_url"]
-        labels = {
-            "full_name": "Full name",
-            "email": "Email",
-            "batch_year": "Batch (year passed out)",
-            "phone": "Contact phone",
-            "address": "Address",
-            "linkedin_url": "LinkedIn profile URL (optional)",
-        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        y = date.today().year
-        self.fields["batch_year"].min_value = 1950
-        self.fields["batch_year"].max_value = y + 6
-        self.fields["batch_year"].widget.attrs.setdefault("placeholder", str(y - 10))
-        self.fields["address"].widget.attrs.setdefault("rows", 3)
-        self.fields["desired_role_codes"].widget.attrs.setdefault("class", "space-y-2")
+        self.fields["desired_role_codes"].choices = [
+            (c, label)
+            for c, label in UserProfile.StakeholderType.choices
+            if c != UserProfile.StakeholderType.FOUNDATION_ADMIN
+        ]
 
     def clean_email(self):
         email = (self.cleaned_data.get("email") or "").strip().lower()
@@ -127,18 +121,45 @@ class NewUserRegistrationForm(forms.ModelForm):
             raise ValidationError(
                 "An account with this email already exists. Please sign in instead."
             )
-        if PendingUserRegistration.objects.filter(
-            email__iexact=email, status=PendingUserRegistration.Status.PENDING
-        ).exists():
-            raise ValidationError(
-                "We already have a pending application for this email. We will contact you soon."
-            )
         return email
 
-    def save(self, commit=True):
-        obj = super().save(commit=False)
-        obj.desired_roles = list(self.cleaned_data["desired_role_codes"])
-        obj.status = PendingUserRegistration.Status.PENDING
-        if commit:
-            obj.save()
-        return obj
+    def save(self):
+        # We handle user creation in the view to log them in, 
+        # or we can do it here and return the user.
+        cd = self.cleaned_data
+        user = User.objects.create_user(
+            username=cd["email"],
+            email=cd["email"],
+            password=cd["password"],
+            first_name=cd["first_name"],
+            last_name=cd["last_name"],
+        )
+        
+        # UserProfile is created via signal, so we just update it
+        profile = user.profile
+        profile.batch_year = cd.get("batch_year")
+        profile.phone = cd.get("phone", "")
+        profile.linkedin_url = cd["linkedin_url"]
+        profile.needs_persona_assignment = True
+        profile.save()
+
+        # Create role requests for the desired roles or auto-grant them
+        auto_grant_roles = []
+        for role in cd["desired_role_codes"]:
+            if role in (UserProfile.StakeholderType.HOD, UserProfile.StakeholderType.GOVERNANCE):
+                UserRoleRequest.objects.create(
+                    user=user,
+                    requested_persona=role,
+                    reason="Requested during registration."
+                )
+            else:
+                auto_grant_roles.append(role)
+
+        if auto_grant_roles:
+            from apps.stakeholders.models import UserStakeholderPersona
+            for role in auto_grant_roles:
+                UserStakeholderPersona.objects.create(user=user, persona_type=role)
+            profile.needs_persona_assignment = False
+            profile.save()
+
+        return user

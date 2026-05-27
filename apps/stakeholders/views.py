@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
@@ -15,13 +16,14 @@ from apps.stakeholders.persona_utils import replace_user_personas
 class NewUserRegistrationView(FormView):
     template_name = "stakeholders/new_user_register.html"
     form_class = NewUserRegistrationForm
-    success_url = reverse_lazy("stakeholders:new_user_register_done")
+    success_url = reverse_lazy("dashboard:home")
 
     def form_valid(self, form):
-        form.save()
+        user = form.save()
+        login(self.request, user, backend='django.contrib.auth.backends.ModelBackend')
         messages.success(
             self.request,
-            "Thank you. Your registration request was submitted. Our team will review it and contact you at the email you provided.",
+            "Registration successful! Welcome to the portal. Your requested roles are pending review.",
         )
         return super().form_valid(form)
 

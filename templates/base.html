@@ -11,186 +11,139 @@
   <link rel="stylesheet" href="{% static 'css/main.css' %}">
   {% block extra_head %}{% endblock %}
 </head>
-<body class="min-h-full bg-slate-50 text-slate-900" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-  <header class="shadow-sm">
-    <div class="border-b border-slate-700/40 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-800">
-      <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:py-3.5">
-        <a href="{% url 'dashboard:home' %}" class="flex min-w-0 flex-1 items-center sm:flex-none focus:outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-white/40">
-          <img
-            src="{% static 'img/iitkgp-alumni-association-logo.png' %}"
-            alt="IIT Kharagpur Alumni Association Logo"
-            class="h-9 w-auto max-w-full object-contain object-left sm:h-11"
-            width="360"
-            height="48"
-            loading="eager"
-            decoding="async"
-          >
+<body class="flex h-screen overflow-hidden bg-slate-50 text-slate-900" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <!-- Mobile Header -->
+  <div class="md:hidden flex items-center justify-between bg-slate-900 px-4 py-3 text-white shrink-0">
+    <a href="{% url 'dashboard:home' %}" class="flex items-center gap-2">
+      <img src="{% static 'img/iitkgp-alumni-association-logo.png' %}" alt="Logo" class="h-8 w-auto max-w-[200px] object-contain object-left">
+    </a>
+    <button type="button" id="nav-toggle" class="text-white hover:text-emerald-400 focus:outline-none">
+      <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Sidebar Navigation -->
+  <aside id="sidebar-menu" class="hidden md:flex flex-col w-64 shrink-0 bg-slate-900 text-slate-300 absolute md:relative z-40 h-full transition-transform transform -translate-x-full md:translate-x-0">
+    <div class="flex items-center px-4 py-4 border-b border-slate-700/50">
+      <a href="{% url 'dashboard:home' %}" class="flex items-center">
+        <img src="{% static 'img/iitkgp-alumni-association-logo.png' %}" alt="Logo" class="h-10 w-auto max-w-full object-contain object-left">
+      </a>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+      {% if user.is_authenticated %}
+        {% for item in nav_items %}
+          {% if item.key != 'profile' %}
+          <a href="{{ item.url }}" class="flex items-center px-3 py-2 text-sm font-medium rounded-md {% if item.active %}bg-slate-800 text-white{% else %}hover:bg-slate-800 hover:text-white{% endif %}">
+            {{ item.label }}
+          </a>
+          {% endif %}
+        {% endfor %}
+
+        {% if nav_more_items %}
+          <div class="mt-4 mb-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">More</div>
+          {% for item in nav_more_items %}
+          <a href="{{ item.url }}" class="flex items-center px-3 py-2 text-sm font-medium rounded-md {% if item.active %}bg-slate-800 text-white{% else %}hover:bg-slate-800 hover:text-white{% endif %}">
+            {{ item.label }}
+          </a>
+          {% endfor %}
+        {% endif %}
+      {% else %}
+        <a href="{% url 'account_login' %}" class="flex items-center px-3 py-2 text-sm font-medium rounded-md bg-emerald-700 text-white hover:bg-emerald-600">
+          Login
         </a>
-        <span class="shrink-0 text-xs font-medium uppercase tracking-wide text-white/80 sm:text-sm">MSU Vision 2020</span>
+      {% endif %}
+    </nav>
+
+    {% if user.is_authenticated %}
+    <div class="p-4 border-t border-slate-700/50">
+      <div class="flex flex-col gap-2">
+        {% for item in nav_items %}
+          {% if item.key == 'profile' %}
+          <a href="{{ item.url }}" class="text-sm font-medium text-slate-300 hover:text-white truncate">
+            {{ user.username }}'s Profile
+          </a>
+          {% endif %}
+        {% endfor %}
+
+        {% if show_role_switcher %}
+        <form method="post" action="{% url 'dashboard:switch_role' %}" class="w-full mt-2">
+          {% csrf_token %}
+          <label for="active-persona" class="sr-only">Active role</label>
+          <select id="active-persona" name="persona" onchange="this.form.submit()" class="block w-full rounded-md border-0 bg-slate-800 py-1.5 text-white shadow-sm ring-1 ring-inset ring-slate-700 focus:ring-2 focus:ring-inset focus:ring-emerald-600 sm:text-sm sm:leading-6">
+            {% for p in persona_choices %}
+            <option value="{{ p.code }}"{% if p.active %} selected{% endif %}>{{ p.label }}</option>
+            {% endfor %}
+          </select>
+        </form>
+        {% else %}
+          <div class="mt-1 text-xs text-slate-400">
+          {% for p in persona_choices %}
+            {% if forloop.first %}{{ p.label }}{% endif %}
+          {% empty %}
+            {{ user.username }}
+          {% endfor %}
+          </div>
+        {% endif %}
+
+        <a href="{% url 'account_logout' %}" class="mt-3 flex items-center px-3 py-2 text-sm font-medium rounded-md text-slate-300 hover:bg-slate-800 hover:text-white">
+          Logout
+        </a>
       </div>
     </div>
-    <nav class="border-b border-slate-200 bg-white" aria-label="Main">
-      <div class="mx-auto max-w-6xl px-4 py-2.5">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          {% if user.is_authenticated %}
-          <button
-            type="button"
-            id="nav-toggle"
-            class="nav-toggle md:hidden"
-            aria-expanded="false"
-            aria-controls="nav-menu"
-            aria-label="Toggle navigation menu"
-          >
-            <span class="nav-toggle-bar"></span>
-            <span class="nav-toggle-bar"></span>
-            <span class="nav-toggle-bar"></span>
-          </button>
-          {% endif %}
-
-          <div id="nav-menu" class="hidden w-full flex-col gap-1 text-sm md:flex md:w-auto md:flex-1 md:flex-row md:flex-wrap md:items-center md:justify-end md:gap-3">
-            {% if user.is_authenticated %}
-              {% for item in nav_items %}
-                {% if item.key != 'profile' %}
-                <a
-                  href="{{ item.url }}"
-                  class="nav-link text-slate-600 hover:text-emerald-700{% if item.active %} nav-link-active{% endif %}"
-                >{{ item.label }}</a>
-                {% endif %}
-              {% endfor %}
-
-              {% if nav_more_items %}
-              <div class="nav-more-dropdown relative">
-                <button
-                  type="button"
-                  class="nav-more-btn text-slate-600 hover:text-emerald-700 md:inline-flex"
-                  aria-haspopup="true"
-                  aria-expanded="false"
-                >More ▾</button>
-                <div class="nav-more-panel" role="menu">
-                  {% for item in nav_more_items %}
-                  <a
-                    href="{{ item.url }}"
-                    role="menuitem"
-                    class="block px-3 py-2 text-slate-700 hover:bg-slate-50{% if item.active %} nav-link-active{% endif %}"
-                  >{{ item.label }}</a>
-                  {% endfor %}
-                </div>
-              </div>
-              {% endif %}
-
-              {% for item in nav_items %}
-                {% if item.key == 'profile' %}
-                <a
-                  href="{{ item.url }}"
-                  class="nav-link text-slate-600 hover:text-emerald-700{% if item.active %} nav-link-active{% endif %}"
-                >{{ item.label }}</a>
-                {% endif %}
-              {% endfor %}
-
-              <span class="hidden text-slate-300 md:inline">|</span>
-
-              <div class="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2 md:border-0 md:pt-0">
-                {% if show_role_switcher %}
-                <form method="post" action="{% url 'dashboard:switch_role' %}" class="role-switcher inline-flex items-center gap-1">
-                  {% csrf_token %}
-                  <label for="active-persona" class="sr-only">Active role</label>
-                  <select
-                    id="active-persona"
-                    name="persona"
-                    onchange="this.form.submit()"
-                    class="text-slate-600"
-                  >
-                    {% for p in persona_choices %}
-                    <option value="{{ p.code }}"{% if p.active %} selected{% endif %}>{{ p.label }}</option>
-                    {% endfor %}
-                  </select>
-                </form>
-                {% else %}
-                  {% for p in persona_choices %}
-                    {% if forloop.first %}
-                    <span class="text-xs text-slate-500">{{ p.label }}</span>
-                    {% endif %}
-                  {% empty %}
-                    <span class="text-slate-500">{{ user.username }}</span>
-                  {% endfor %}
-                {% endif %}
-
-                {% if not show_role_switcher and not persona_choices %}
-                <span class="text-slate-500">{{ user.username }}</span>
-                {% endif %}
-
-                <a class="rounded bg-slate-200 px-2 py-1 text-slate-700 hover:bg-slate-300" href="{% url 'account_logout' %}">Logout</a>
-              </div>
-            {% else %}
-              <a class="rounded bg-emerald-700 px-3 py-1.5 text-white hover:bg-emerald-800" href="{% url 'account_login' %}">Login</a>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </nav>
-  </header>
-  <main class="mx-auto max-w-6xl px-4 py-8">
-    {% if messages %}
-      <ul class="mb-6 space-y-2.5" role="status">
-        {% for message in messages %}
-          <li class="alert-banner alert-{% if message.tags == 'error' %}error{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} flex items-center justify-between gap-3 px-4 py-3 rounded-lg border shadow-sm transition-all duration-300">
-            <div class="flex items-center gap-3">
-              <!-- SVG Icons by Level (Phase 10.6) -->
-              {% if message.tags == 'success' %}
-                <svg class="h-5 w-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              {% elif message.tags == 'warning' %}
-                <svg class="h-5 w-5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                </svg>
-              {% elif message.tags == 'error' %}
-                <svg class="h-5 w-5 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              {% else %}
-                <svg class="h-5 w-5 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              {% endif %}
-              <span class="font-medium text-sm">{{ message }}</span>
-            </div>
-            <button type="button" class="alert-dismiss text-slate-400 hover:text-slate-600 font-semibold" aria-label="Dismiss" onclick="this.closest('li').remove()">×</button>
-          </li>
-        {% endfor %}
-      </ul>
     {% endif %}
-    {% block content %}{% endblock %}
-  </main>
+  </aside>
+
+  <!-- Main Content Area -->
+  <div class="flex flex-col flex-1 overflow-hidden bg-slate-50">
+    <main class="flex-1 overflow-y-auto px-4 py-8 sm:px-6 lg:px-8">
+      <div class="mx-auto max-w-6xl">
+        {% if messages %}
+          <ul class="mb-6 space-y-2.5" role="status">
+            {% for message in messages %}
+              <li class="alert-banner alert-{% if message.tags == 'error' %}error{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} flex items-center justify-between gap-3 px-4 py-3 rounded-lg border shadow-sm transition-all duration-300">
+                <div class="flex items-center gap-3">
+                  {% if message.tags == 'success' %}
+                    <svg class="h-5 w-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  {% elif message.tags == 'warning' %}
+                    <svg class="h-5 w-5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                  {% elif message.tags == 'error' %}
+                    <svg class="h-5 w-5 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  {% else %}
+                    <svg class="h-5 w-5 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  {% endif %}
+                  <span class="font-medium text-sm">{{ message }}</span>
+                </div>
+                <button type="button" class="alert-dismiss text-slate-400 hover:text-slate-600 font-semibold" aria-label="Dismiss" onclick="this.closest('li').remove()">×</button>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script>
     (function () {
       var toggle = document.getElementById('nav-toggle');
-      var menu = document.getElementById('nav-menu');
-      if (toggle && menu) {
+      var sidebar = document.getElementById('sidebar-menu');
+      if (toggle && sidebar) {
         toggle.addEventListener('click', function () {
-          var open = menu.classList.toggle('nav-menu-open');
-          menu.classList.toggle('hidden', !open);
-          toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+          sidebar.classList.toggle('hidden');
+          sidebar.classList.toggle('-translate-x-full');
         });
       }
-      document.querySelectorAll('.nav-more-btn').forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
-          e.stopPropagation();
-          var wrap = btn.closest('.nav-more-dropdown');
-          if (wrap) {
-            wrap.classList.toggle('is-open');
-            btn.setAttribute('aria-expanded', wrap.classList.contains('is-open'));
-          }
-        });
-      });
-      document.addEventListener('click', function () {
-        document.querySelectorAll('.nav-more-dropdown.is-open').forEach(function (el) {
-          el.classList.remove('is-open');
-          var b = el.querySelector('.nav-more-btn');
-          if (b) b.setAttribute('aria-expanded', 'false');
-        });
-      });
     })();
   </script>
   {% block extra_js %}{% endblock %}

@@ -40,9 +40,6 @@ class UserProfile(TimeStampedModel):
         FINANCE_CONTROLLER = "finance_controller", "Finance Controller"
         GOVERNANCE = "governance", "Governance Team"
         AUDITOR = "auditor", "Auditor"
-        STUDENT_BENEFICIARY = "student_beneficiary", "Student Beneficiary"
-        CSR_CORPORATE_DONOR = "csr_corporate_donor", "CSR / Corporate Donor"
-        PROGRAM_MANAGER = "program_manager", "Program Manager"
 
     class Jurisdiction(models.TextChoices):
         INDIA = "india", "India"
@@ -61,7 +58,7 @@ class UserProfile(TimeStampedModel):
     batch_year = models.PositiveSmallIntegerField(null=True, blank=True)
     department = models.CharField(max_length=255, blank=True)
     phone = models.CharField(max_length=32, blank=True)
-    linkedin_url = models.URLField(blank=True)
+    linkedin_url = models.URLField(blank=False)
     bio = models.TextField(blank=True)
     photo = models.ImageField(upload_to="profile_photos/%Y/", blank=True, null=True)
     needs_persona_assignment = models.BooleanField(
