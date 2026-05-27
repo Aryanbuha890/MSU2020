@@ -41,12 +41,29 @@ def handle_expense_status(sender, instance, created, **kwargs):
     if not created and hasattr(instance, '_old_status') and instance._old_status != instance.status:
         notifications.notify_expense_status_change(instance, instance._old_status, instance.status, instance.approved_by or instance.requested_by)
 
+@receiver(pre_save, sender=UserRoleRequest)
+def track_role_request_status(sender, instance, **kwargs):
+    if instance.pk:
+        old = UserRoleRequest.objects.filter(pk=instance.pk).first()
+        if old:
+            instance._old_status = old.status
+
 @receiver(post_save, sender=UserRoleRequest)
 def handle_role_request(sender, instance, created, **kwargs):
     if created:
         notifications.notify_role_request(instance)
-    elif instance.status in [UserRoleRequest.Status.APPROVED, UserRoleRequest.Status.REJECTED]:
-        notifications.notify_role_decision(instance)
+    else:
+        old_status = getattr(instance, '_old_status', None)
+        if old_status != instance.status:
+            if instance.status == UserRoleRequest.Status.APPROVED:
+                from apps.stakeholders.persona_utils import replace_user_personas
+                personas = list(instance.user.profile.persona_codes())
+                if instance.requested_persona not in personas:
+                    personas.append(instance.requested_persona)
+                replace_user_personas(instance.user, personas)
+
+            if instance.status in [UserRoleRequest.Status.APPROVED, UserRoleRequest.Status.REJECTED]:
+                notifications.notify_role_decision(instance)
 
 @receiver(post_save, sender=UploadAuditLog)
 def handle_upload_audit(sender, instance, created, **kwargs):

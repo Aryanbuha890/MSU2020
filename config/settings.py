@@ -128,6 +128,8 @@ LOGIN_URL = "/accounts/login/"
 ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_LOGIN_METHODS = {"email", "username"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "username*", "password1*", "password2*"]
+ACCOUNT_SESSION_REMEMBER = True
+
 
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
