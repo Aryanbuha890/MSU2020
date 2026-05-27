@@ -1,5 +1,5 @@
 # MVP: Python 3.9+ / Django 4.2 (use Python 3.12 + Django 5.1 per architecture doc in production)
-Django>=4.2,<5.0
+Django>=5.1
 django-environ>=0.11
 django-htmx>=1.17
 django-allauth[socialaccount]>=0.61

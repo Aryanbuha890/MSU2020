@@ -435,7 +435,7 @@ def switch_role(request):
     if persona in codes:
         request.session["active_persona"] = persona
         messages.success(request, "Active role updated.")
-    return redirect(request.META.get("HTTP_REFERER") or "dashboard:home")
+    return redirect("dashboard:home")
 
 
 def toggle_currency(request):
