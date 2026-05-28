@@ -145,12 +145,12 @@
         });
       }
 
-      // Disable mouse wheel / touchpad scroll from changing active number input values
+      // Safely blur active number inputs on scroll to prevent value changes while keeping page scroll active
       document.addEventListener('wheel', function (e) {
         if (document.activeElement && document.activeElement.type === 'number') {
-          e.preventDefault();
+          document.activeElement.blur();
         }
-      }, { passive: false });
+      });
     })();
   </script>
   {% block extra_js %}{% endblock %}

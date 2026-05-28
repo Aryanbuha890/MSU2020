@@ -31,6 +31,9 @@ class NeedForm(forms.ModelForm):
         if not self.instance.pk:
             self.fields["target_amount"].initial = ""
         self.fields["target_amount"].widget.attrs.update({"min": "0"})
+        
+        # Set empty label for Department field
+        self.fields["department"].empty_label = "Choose Department...."
 
     def clean_target_amount(self):
         amount = self.cleaned_data.get("target_amount")

@@ -80,6 +80,16 @@ class Command(BaseCommand):
             "Department of Textile Chemistry",
             "Department of Textile Engineering",
             "Water Resources Engineering and Management Institute (WREMI)",
+            
+            # Additional departments for user's test plan
+            "Computer Eng.",
+            "Mechanical Eng.",
+            "Applied Math",
+            "Chemical Eng.",
+            "Civil Eng.",
+            "Electrical Eng.",
+            "Electronics (ECE)",
+            "Info. Tech (IT)",
         ]
 
         depts = {}
@@ -135,6 +145,7 @@ class Command(BaseCommand):
         )
         auditor = _user("auditor_kim", "audit@msu-vision.example", "demo123", UserProfile.StakeholderType.AUDITOR)
         hod_test = _user("hod_test", "hod.test@msu-vision.example", "Tester@123", UserProfile.StakeholderType.HOD)
+        gov_test = _user("gov_test", "gov.test@msu-vision.example", "Tester@123", UserProfile.StakeholderType.GOVERNANCE)
 
         # --- HOD: draft need (academic) ---
         need_wifi, _ = Need.objects.get_or_create(
