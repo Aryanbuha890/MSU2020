@@ -41,6 +41,7 @@ def _user(username, email, password, role, org=None):
     prof.stakeholder_type = role
     prof.organization = org
     prof.save()
+    replace_user_personas(u, [role])
     return u
 
 
@@ -146,6 +147,11 @@ class Command(BaseCommand):
         auditor = _user("auditor_kim", "audit@msu-vision.example", "demo123", UserProfile.StakeholderType.AUDITOR)
         hod_test = _user("hod_test", "hod.test@msu-vision.example", "Tester@123", UserProfile.StakeholderType.HOD)
         gov_test = _user("gov_test", "gov.test@msu-vision.example", "Tester@123", UserProfile.StakeholderType.GOVERNANCE)
+        lead_test = _user("lead_test", "lead.test@msu-vision.example", "Tester@123", UserProfile.StakeholderType.PROJECT_LEAD)
+        donor_test = _user("donor_test", "donor.test@msu-vision.example", "Tester@123", UserProfile.StakeholderType.DONOR)
+        finance_test = _user("finance_test", "finance.test@msu-vision.example", "Tester@123", UserProfile.StakeholderType.FINANCE_CONTROLLER)
+        volunteer_test = _user("volunteer_test", "volunteer.test@msu-vision.example", "Tester@123", UserProfile.StakeholderType.VOLUNTEER)
+        auditor_test = _user("auditor_test", "auditor.test@msu-vision.example", "Tester@123", UserProfile.StakeholderType.AUDITOR)
 
         # --- HOD: draft need (academic) ---
         need_wifi, _ = Need.objects.get_or_create(
